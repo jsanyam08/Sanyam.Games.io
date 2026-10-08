@@ -1,0 +1,404 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#070b16">
+<title>Sarvodaya Ahinsa</title>
+
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+<link rel="stylesheet" href="assets/ui.css?v=1790175980">
+
+<style>
+.hero{padding:clamp(26px,5vw,56px) 0 clamp(18px,3vw,30px);text-align:center}
+.hero img{width:min(160px,34vw);filter:drop-shadow(0 14px 44px var(--glow));margin-bottom:16px}
+.hero h1{font-size:clamp(30px,6vw,56px);color:var(--primary);letter-spacing:-.01em;font-family:var(--fs)}
+.hero p{color:var(--tx-mut);letter-spacing:.2em;text-transform:uppercase;font-size:clamp(11px,1.5vw,14px);margin-top:8px}
+
+.joinbox{
+  max-width:520px;margin:22px auto 0;
+  background:var(--panel);border:1px solid var(--bd-lt);border-radius:var(--r-lg);
+  padding:20px;box-shadow:var(--shadow);
+}
+#code-in{
+  text-align:center;font:800 30px/1 var(--fd);letter-spacing:.34em;
+  text-transform:uppercase;padding:16px 10px;
+}
+#code-in::placeholder{letter-spacing:.1em;font-size:16px;font-weight:600}
+
+.whoami{
+  display:flex;align-items:center;justify-content:center;gap:9px;flex-wrap:wrap;
+  max-width:520px;margin:14px auto 0;padding:9px 14px;
+  background:var(--panel-2);border:1px solid var(--bd);border-radius:999px;font-size:13.5px;
+}
+
+.sec{margin:clamp(22px,4vw,40px) 0}
+.sec h2{font-size:15px;letter-spacing:.16em;text-transform:uppercase;color:var(--tx-mut);margin-bottom:14px}
+
+.gcard{
+  display:flex;flex-direction:column;gap:9px;
+  padding:18px;border-radius:var(--r);cursor:pointer;
+  background:var(--panel);border:1px solid var(--bd);
+  transition:var(--t);position:relative;overflow:hidden;text-align:left;
+  font-family:var(--fs);color:var(--tx);
+}
+.gcard::after{content:'';position:absolute;inset:0 auto 0 0;width:4px;background:var(--gc,var(--primary))}
+.gcard:hover{transform:translateY(-3px);border-color:var(--gc,var(--primary));box-shadow:0 14px 34px rgba(0,0,0,.4)}
+.gcard .ic{font-size:30px;line-height:1}
+.gcard .t{font:800 17px/1.25 var(--fd)}
+.gcard .d{font-size:13px;color:var(--tx-mut)}
+
+.livecard{border-color:var(--ok);background:linear-gradient(135deg,var(--ok-glow),transparent)}
+.livecard .code{font:800 21px/1 var(--fd);letter-spacing:.2em;color:var(--ok)}
+
+.hostbar{
+  display:flex;flex-wrap:wrap;gap:8px;align-items:center;
+  padding:12px 14px;border-radius:var(--r);
+  background:var(--panel);border:1px solid var(--primary);
+}
+.foot{margin:34px 0 26px;text-align:center}
+</style>
+</head>
+<body>
+
+<div id="demo-slot"></div>
+<div id="hdr-slot-outer"></div>
+
+<div class="wrap">
+
+  <section class="hero">
+    <img id="hero-logo" alt="">
+    <h1 id="hero-name">सर्वोदय अहिंसा</h1>
+    <p id="hero-tag"></p>
+
+    <div class="joinbox">
+      <label class="f" style="text-align:center;font-size:13px" id="l-code"></label>
+      <input type="text" id="code-in" maxlength="7" placeholder="ABC12" autocomplete="off"
+             autocapitalize="characters" spellcheck="false" inputmode="text">
+      <button class="btn p wide big" id="join-btn" style="margin-top:12px"></button>
+      <div class="sm mut tc" id="join-msg" style="margin-top:9px"></div>
+    </div>
+
+    <div id="who"></div>
+  </section>
+
+  <!-- ══ everything below is for hosts only, and stays hidden until one signs in ══ -->
+  <div id="host-area" class="hide">
+
+    <section class="sec" id="live-sec" class="hide">
+      <h2 id="l-live"></h2>
+      <div class="grid g2" id="live-list"></div>
+    </section>
+
+    <section class="sec">
+      <h2 id="l-games"></h2>
+      <div class="grid g2" id="game-list"></div>
+    </section>
+
+    <div class="hostbar no-print" id="host-tools"></div>
+  </div>
+
+  <div class="foot no-print" id="foot"></div>
+
+</div>
+
+<div id="toast"></div>
+
+<script src="assets/brand.js?v=1790175980"></script>
+<script src="assets/i18n.js?v=1790175980"></script>
+<script src="assets/theme.js?v=1790175980"></script>
+<script src="assets/fb.js?v=1790175980"></script>
+<script src="assets/engine.js?v=1790175980"></script>
+<script src="assets/types/quiz.js?v=1790175980"></script>
+<script src="assets/types/jumble.js?v=1790175980"></script>
+<script src="assets/types/buzzer.js?v=1790175980"></script>
+<script src="assets/types/tambola.js?v=1790175980"></script>
+<script src="assets/types/custom.js?v=1790175980"></script>
+<script>
+/* ═══ सर्वोदय अहिंसा — HOME ══════════════════════════════════════
+   What the audience sees is deliberately tiny: the logo, a box for the
+   code, and their own name if they have been here before. The game
+   library, the studio, the dashboard — none of that is any of their
+   business, and showing it only invites someone to wander into the
+   host panel. It appears after a host signs in, on this same page.
+   ═══════════════════════════════════════════════════════════════ */
+
+const $ = SA.$;
+let IDX = null, LIVE = null, isHost = false;
+
+$('demo-slot').innerHTML = SA.ui.demoBanner();
+/* no page switcher here — this is the audience's page, and the host links
+   only appear further down once a host actually signs in */
+$('hdr-slot-outer').innerHTML = SA.ui.header({ title: SA.brand.name, nav: false });
+$('hero-logo').src = SA.brand.logo;
+$('hero-name').textContent = SA.brand.name;
+SA.ui.wireMode(paintAll);
+
+/* the two games that pre-date the platform — plain links, not Studio games */
+const LEGACY = () => ([
+  { icon:'👑', title:'कौन बनेगा सिद्धात्मा', desc: SA.t('home.kbs_desc'),
+    colour:'#ffcf2e', href:'kbs/index.html',
+    extra:[ {t:SA.t('home.host'), h:'kbs/host.html'}, {t:SA.t('home.projector'), h:'kbs/screen.html'} ] },
+  { icon:'🎟️', title:'अक्षय निधि तम्बोला', desc: SA.t('home.tam_desc'),
+    colour:'#00f0ff', href:'akshaynidhi.html' }
+]);
+
+/* ─────────── static labels ─────────── */
+function paintLabels() {
+  document.title = SA.brand.nameEn;
+  $('hero-tag').textContent   = SA.t('tagline');
+  $('l-code').textContent     = SA.t('home.code_label');
+  $('join-btn').textContent   = '▶ ' + SA.t('home.join');
+  if (!$('join-msg').dataset.err) $('join-msg').textContent = SA.t('home.code_hint');
+  $('l-live').textContent     = '🔴 ' + SA.t('home.live_now');
+  $('l-games').textContent    = '🎮 ' + SA.t('home.our_games');
+}
+
+/* ─────────── profile strip ─────────── */
+function paintWho() {
+  const p = SA.profile.get();
+  if (!p) {
+    $('who').innerHTML = `
+      <div class="whoami">
+        <span class="mut">${SA.esc(SA.t('prof.optional'))}</span>
+        <button class="btn sm" id="mk-prof">👤 ${SA.esc(SA.t('prof.make'))}</button>
+      </div>`;
+    $('mk-prof').onclick = () => profileDialog();
+    return;
+  }
+  $('who').innerHTML = `
+    <div class="whoami">
+      <span>👤 <b>${SA.esc(SA.t('prof.hello', { x: p.name }))}</b>${
+        p.city ? `<span class="mut"> · ${SA.esc(p.city)}</span>` : ''}</span>
+      <button class="btn sm ghost" id="ed-prof">${SA.esc(SA.t('prof.edit'))}</button>
+      <button class="btn sm ghost" id="rm-prof">${SA.esc(SA.t('prof.not_you'))}</button>
+    </div>`;
+  $('ed-prof').onclick = () => profileDialog(p);
+  $('rm-prof').onclick = () => { SA.profile.clear(); SA.toast(SA.t('prof.cleared')); paintWho(); };
+}
+
+function profileDialog(p) {
+  const el = document.createElement('div');
+  el.className = 'ovl';
+  el.innerHTML = `
+    <div class="box card col" style="gap:14px">
+      <div class="row" style="gap:11px">
+        <img src="${SA.brand.logo}" style="height:40px" alt="">
+        <h3 style="font-size:19px">${SA.esc(SA.t('prof.title'))}</h3>
+      </div>
+      <div><label class="f">${SA.esc(SA.t('play.name'))}</label>
+        <input type="text" id="pf-name" maxlength="40" autocomplete="name"
+               value="${SA.esc((p && p.name) || '')}" placeholder="${SA.esc(SA.t('play.name_ph'))}"></div>
+      <div><label class="f">${SA.esc(SA.t('play.city'))}
+          <span class="mut">(${SA.esc(SA.t('optional'))})</span></label>
+        <input type="text" id="pf-city" maxlength="40"
+               value="${SA.esc((p && p.city) || '')}" placeholder="${SA.esc(SA.t('play.city_ph'))}"></div>
+
+      <div class="grid g2">
+        <div><label class="f">${SA.esc(SA.t('play.phone'))}
+            <span class="mut">(${SA.esc(SA.t('optional'))})</span></label>
+          <input type="tel" id="pf-phone" maxlength="15" inputmode="numeric"
+                 value="${SA.esc((p && p.phone) || '')}" placeholder="${SA.esc(SA.t('play.phone_ph'))}"></div>
+        <div><label class="f">${SA.esc(SA.t('play.age'))}
+            <span class="mut">(${SA.esc(SA.t('optional'))})</span></label>
+          <input type="number" id="pf-age" min="3" max="120" inputmode="numeric"
+                 value="${(p && p.age) || ''}" placeholder="${SA.esc(SA.t('play.age_ph'))}"></div>
+      </div>
+
+      <div class="sm mut">${SA.esc(SA.t('prof.why'))}</div>
+      <div class="sub sm mut">🔒 ${SA.esc(SA.t('prof.privacy'))}</div>
+      <div class="row" style="justify-content:flex-end;gap:8px">
+        ${p ? `<button class="btn ghost" data-clear>${SA.esc(SA.t('prof.clear'))}</button>` : ''}
+        <button class="btn ghost" data-no>${SA.esc(SA.t('cancel'))}</button>
+        <button class="btn p" data-yes>${SA.esc(SA.t('prof.make'))}</button>
+      </div>
+    </div>`;
+  document.body.appendChild(el);
+  const close = () => el.remove();
+  el.querySelector('[data-no]').onclick = close;
+  el.onclick = e => { if (e.target === el) close(); };
+  const clr = el.querySelector('[data-clear]');
+  if (clr) clr.onclick = () => { SA.profile.clear(); close(); SA.toast(SA.t('prof.cleared')); paintWho(); };
+  el.querySelector('#pf-name').focus();
+  el.querySelector('[data-yes]').onclick = () => {
+    const name  = el.querySelector('#pf-name').value.trim();
+    const phone = el.querySelector('#pf-phone').value.trim();
+    const age   = el.querySelector('#pf-age').value.trim();
+    if (!name) { el.querySelector('#pf-name').focus(); SA.toast(SA.t('play.name_req'), true); return; }
+    /* only complain about a field they actually filled in */
+    if (phone && !SA.profile.validPhone(phone)) {
+      el.querySelector('#pf-phone').focus(); SA.toast(SA.t('play.phone_bad'), true); return;
+    }
+    if (age && !SA.profile.validAge(age)) {
+      el.querySelector('#pf-age').focus(); SA.toast(SA.t('play.age_bad'), true); return;
+    }
+    SA.profile.save(name, el.querySelector('#pf-city').value.trim(), phone, age);
+    close(); SA.toast(SA.t('prof.saved')); paintWho();
+  };
+}
+
+/* ─────────── join ─────────── */
+function msg(t, err) {
+  const el = $('join-msg');
+  el.textContent = t;
+  el.dataset.err = err ? '1' : '';
+  el.style.color = err ? 'var(--bad)' : 'var(--tx-mut)';
+}
+
+function tryJoin() {
+  const code = $('code-in').value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (code.length < 4) { msg(SA.t('home.code_short'), true); return; }
+  const btn = $('join-btn');
+  btn.disabled = true; btn.textContent = SA.t('home.checking');
+  SA.sess.byCode(code).then(sid => {
+    if (!sid) {
+      msg(SA.t('home.code_bad'), true);
+      btn.disabled = false; btn.textContent = '▶ ' + SA.t('home.join');
+      $('code-in').select();
+      return;
+    }
+    /* the projector QR carries a venue; keep it so a scan in Jaipur
+       lands in Jaipur and not on the main stage */
+    const v = SA.qs('v');
+    location.href = 'play.html?s=' + encodeURIComponent(sid) + (v ? '&v=' + encodeURIComponent(v) : '');
+  }).catch(e => {
+    msg(e.message || SA.t('home.code_bad'), true);
+    btn.disabled = false; btn.textContent = '▶ ' + SA.t('home.join');
+  });
+}
+$('join-btn').onclick = tryJoin;
+$('code-in').addEventListener('keydown', e => { if (e.key === 'Enter') tryJoin(); });
+$('code-in').addEventListener('input', e => {
+  e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+});
+/* a printed QR can carry the code directly: /?c=ABC12 */
+const preset = SA.qs('c');
+if (preset) { $('code-in').value = preset.toUpperCase(); setTimeout(tryJoin, 350); }
+
+/* ─────────── host area ─────────── */
+function typeLabel(t) { const m = SA.types.get(t); return m ? (m.hi || m.label) : ''; }
+
+function paintHostArea() {
+  $('host-area').classList.toggle('hide', !isHost);
+  if (!isHost) return;
+
+  const rows = Object.entries(IDX || {})
+    .map(([id, g]) => Object.assign({ id }, g))
+    .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+
+  $('game-list').innerHTML =
+    rows.map(g => `
+      <button class="gcard" style="--gc:${g.primary || 'var(--primary)'}" data-go="host.html?g=${g.id}">
+        <span class="ic">${SA.esc(g.icon || '🎯')}</span>
+        <span class="t">${SA.esc(g.title)}</span>
+        <span class="d">${SA.esc(g.subtitle || typeLabel(g.type))}${
+          g.published ? '' : ' · ' + SA.esc(SA.t('host.draft'))}</span>
+      </button>`).join('') +
+    LEGACY().map(l => `
+      <div class="gcard" style="--gc:${l.colour}">
+        <span class="ic">${l.icon}</span>
+        <span class="t">${SA.esc(l.title)}</span>
+        <span class="d">${SA.esc(l.desc)}</span>
+        <span class="row wrap-r" style="gap:6px;margin-top:4px">
+          <a class="btn sm p" href="${l.href}">${SA.esc(SA.t('home.play'))}</a>
+          ${(l.extra || []).map(e => `<a class="btn sm ghost" href="${e.h}">${SA.esc(e.t)}</a>`).join('')}
+        </span>
+      </div>`).join('');
+
+  $('game-list').querySelectorAll('[data-go]').forEach(b => b.onclick = () => location.href = b.dataset.go);
+
+  const live = Object.entries(LIVE || {})
+    .map(([sid, s]) => Object.assign({ sid }, s))
+    .filter(s => Date.now() - (s.at || 0) < 14 * 3600e3)
+    .sort((a, b) => (b.at || 0) - (a.at || 0));
+
+  $('live-sec').classList.toggle('hide', !live.length);
+  $('live-list').innerHTML = live.map(s => `
+    <button class="gcard livecard" style="--gc:${s.primary || 'var(--ok)'}" data-live="${s.sid}">
+      <span class="row" style="gap:9px"><span class="dot live"></span>
+        <span class="xs" style="color:var(--ok)">${SA.esc(SA.t('home.live_now'))}</span></span>
+      <span class="t">${SA.esc(s.icon || '🎯')} ${SA.esc(s.title)}</span>
+      <span class="code">${SA.esc(s.code)}</span>
+      <span class="d">${SA.esc(SA.t('db.run_it'))}</span>
+    </button>`).join('');
+  $('live-list').querySelectorAll('[data-live]').forEach(b =>
+    b.onclick = () => location.href = 'host.html?s=' + b.dataset.live);
+
+  $('host-tools').innerHTML = `
+    <span class="pill ok"><span class="dot live"></span>${SA.esc(SA.t('home.signed_host'))}</span>
+    <span class="sm mut">${SA.esc((SA.auth.user && SA.auth.user.email) || '')}</span>
+    <span class="grow"></span>
+    <a class="btn sm p" href="studio.html">🛠️ ${SA.esc(SA.t('home.studio'))}</a>
+    <a class="btn sm" href="host.html">🎛️ ${SA.esc(SA.t('home.host_panel'))}</a>
+    <a class="btn sm ghost" href="dashboard.html">📊 ${SA.esc(SA.t('home.dashboard'))}</a>
+    <a class="btn sm ghost" href="tickets.html">🎟️ ${SA.esc(SA.t('home.tickets'))}</a>
+    <button class="btn sm ghost" id="sign-out">${SA.esc(SA.t('signout'))}</button>`;
+  $('sign-out').onclick = () => SA.auth.signOut().then(() => location.reload());
+}
+
+/* one quiet line, not a row of buttons that tempt the audience */
+function paintFoot() {
+  $('foot').innerHTML = isHost ? '' :
+    `<button class="btn sm ghost" id="host-in">🔑 ${SA.esc(SA.t('home.host_signin'))}</button>`;
+  const b = $('host-in');
+  if (b) b.onclick = hostLogin;
+}
+
+function hostLogin() {
+  const el = document.createElement('div');
+  el.className = 'ovl';
+  const draw = (m, err) => {
+    el.innerHTML = `<div class="box card">${SA.ui.loginForm(m, err)}</div>`;
+    el.querySelector('#gate-form').onsubmit = ev => {
+      ev.preventDefault();
+      const btn = SA.$('lg-btn');
+      btn.disabled = true; btn.textContent = SA.t('gate.signing');
+      SA.auth.signIn(SA.$('lg-email').value.trim(), SA.$('lg-pass').value)
+        .then(() => el.remove())
+        .catch(e => draw('<b>' + SA.esc(SA.auth.errText(e)) + '</b>', true));
+    };
+  };
+  draw();
+  document.body.appendChild(el);
+  el.onclick = e => { if (e.target === el) el.remove(); };
+}
+
+function paintAll() { paintLabels(); paintWho(); paintHostArea(); paintFoot(); }
+
+/* ─────────── boot ─────────── */
+paintAll();
+
+function watch() {
+  SA.db.ref('sa/gameIndex').on(v => { IDX = v; paintHostArea(); });
+  SA.db.ref('sa/liveNow').on(v => { LIVE = v; paintHostArea(); });
+}
+
+if (SA.DEMO) {
+  isHost = true; watch(); paintAll();
+} else {
+  SA.auth.onUser((u, admin) => {
+    if (!u) { SA.auth.signInAnon().catch(() => {}); return; }
+    const was = isHost;
+    isHost = !!admin;
+    if (isHost && !was) watch();
+    paintAll();
+  });
+}
+</script>
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
+

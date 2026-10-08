@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kaun Banega Siddhatma - Projector Screen</title>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Mukta:wght@400;600;800&family=Poppins:wght@400;600;800&display=swap');
+        
+        :root { 
+            --bg-center: #1a0b3c; --bg-edge: #000000; 
+            --gold-bright: #ffdf00; --gold-dark: #b8860b; --gold-border: #d4af37; 
+            --box-bg: linear-gradient(180deg, #09133a 0%, #152769 50%, #09133a 100%); 
+            --opt-locked: linear-gradient(180deg, #d84315 0%, #f57c00 100%); 
+            --opt-correct: linear-gradient(180deg, #014d20 0%, #007b33 100%); 
+            --opt-wrong: linear-gradient(180deg, #660000 0%, #a30000 100%); 
+            --text-light: #ffffff; 
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Mukta', 'Poppins', sans-serif; }
+        body { background: #000; height: 100vh; width: 100vw; display: flex; align-items: center; justify-content: center; overflow: hidden; margin: 0; }
+
+        .projector-frame {
+            position: relative; background: radial-gradient(circle at center, var(--bg-center) 0%, var(--bg-edge) 80%);
+            width: 100vw; height: 56.25vw; max-height: 100vh; max-width: 177.78vh; 
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            color: var(--text-light); overflow: hidden; box-shadow: 0 0 50px rgba(0,0,0,1);
+        }
+
+        .bg-rays { position: absolute; top: 50%; left: 50%; width: 150%; height: 150%; background: repeating-conic-gradient(from 0deg, transparent 0deg 5deg, rgba(255, 255, 255, 0.05) 5deg 10deg); transform: translate(-50%, -50%); animation: spin 90s linear infinite; z-index: -2; }
+        @keyframes spin { 100% { transform: translate(-50%, -50%) rotate(360deg); } }
+
+        .game-wrapper { width: 85%; height: 85%; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; z-index: 10; padding-bottom: 2%;}
+        .top-hud { width: 100%; display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 2%; }
+        .lifelines { display: flex; gap: 1.5vw; }
+        .lifeline-icon { width: 6vw; height: 4.5vw; border-radius: 2.2vw; background: var(--box-bg); border: 2px solid var(--gold-border); display: flex; align-items: center; justify-content: center; font-size: 1.2vw; font-weight: 800; color: var(--gold-bright); box-shadow: 0 5px 15px rgba(0,0,0,0.8); transition: 0.5s; }
+        .lifeline-icon.used { opacity: 0.2; filter: grayscale(100%); box-shadow: none; border-color: #555; color: #555;}
+        
+        .timer-container { width: 9vw; height: 9vw; border-radius: 50%; background: radial-gradient(circle, #000 0%, #111 100%); border: 4px solid var(--gold-bright); display: flex; align-items: center; justify-content: center; font-size: 3vw; font-weight: 800; color: var(--text-light); box-shadow: 0 10px 20px rgba(0,0,0,0.8); text-shadow: 0 2px 4px #000; }
+        .level-badge { background: linear-gradient(90deg, var(--gold-dark), var(--gold-bright)); color: #000; padding: 0.5vw 2vw; border-radius: 2vw; font-size: 1.2vw; font-weight: 800; margin-bottom: 1.5%; border: 2px solid #fff; box-shadow: 0 5px 15px rgba(0,0,0,0.8); letter-spacing: 1px; }
+        .question-box { width: 100%; background: var(--box-bg); border: 3px solid var(--gold-border); border-radius: 4vw; padding: 2vw 4vw; font-size: 2vw; font-weight: 800; text-align: center; box-shadow: 0 15px 40px rgba(0,0,0,0.9), inset 0 0 30px rgba(255,255,255,0.1); margin-bottom: 2.5%; position: relative; letter-spacing: 1px; line-height: 1.3; }
+        
+        .options-grid { width: 100%; display: grid; grid-template-columns: 1fr 1fr; gap: 2vw; }
+        .option-box { background: var(--box-bg); border: 2px solid var(--gold-border); border-radius: 4vw; padding: 1.5vw 3vw; font-size: 1.5vw; display: flex; align-items: center; box-shadow: 0 10px 20px rgba(0,0,0,0.8); position: relative; transition: all 0.3s ease; opacity: 1;}
+        
+        /* NEW: Invisible class for "Reveal Options" logic */
+        .option-box.invisible { opacity: 0 !important; pointer-events: none; }
+        
+        .opt-lbl { color: var(--gold-bright); font-weight: 800; margin-right: 2vw; font-size: 1.8vw; text-shadow: 0 2px 4px #000; }
+        .opt-txt { font-weight: 600; text-shadow: 0 2px 4px #000; }
+        .option-box.locked { background: var(--opt-locked); border-color: #fff; transform: scale(1.02); }
+        .option-box.correct { background: var(--opt-correct); border-color: #fff; animation: flashCorrect 0.4s 5 alternate; transform: scale(1.05); z-index: 5;}
+        .option-box.wrong { background: var(--opt-wrong); border-color: #fff; animation: flashWrong 0.4s 5 alternate;}
+        .option-box.hidden { opacity: 0; pointer-events: none; }
+        @keyframes flashCorrect { 0% { background: var(--opt-correct); } 100% { background: #000; } }
+        @keyframes flashWrong { 0% { background: var(--opt-wrong); } 100% { background: #000; } }
+
+        #audience-q-mode { display: none; }
+        #audience-q-mode .question-box { border-color: #d946ef; box-shadow: 0 15px 40px rgba(0,0,0,0.9), inset 0 0 30px rgba(217, 70, 239, 0.2); }
+        #audience-q-mode .option-box { border-color: #d946ef; }
+        #audience-q-mode .opt-lbl { color: #d946ef; text-shadow: 0 0 10px rgba(217, 70, 239, 0.5); }
+        #audience-q-mode .level-badge { background: linear-gradient(90deg, #42275a, #734b6d); color: #fff; border-color: #d946ef; box-shadow: 0 0 20px rgba(217, 70, 239, 0.5); }
+        
+        #fff-mode { display: none; }
+        .fff-grid { display: flex; flex-direction: column; gap: 1.5vw; width: 80%; }
+        .fff-opt { background: var(--box-bg); border: 2px solid var(--gold-border); border-radius: 1.5vw; padding: 1vw 2vw; font-size: 1.5vw; font-weight: bold; display: flex; justify-content: space-between; box-shadow: 0 10px 20px rgba(0,0,0,0.8);}
+
+        /* OVERLAYS */
+        .modal-screen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); backdrop-filter: blur(10px); display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.5s ease; z-index: 100; }
+        .modal-screen.active { opacity: 1; pointer-events: auto; }
+        
+        .ladder-container { background: var(--box-bg); border: 4px solid var(--gold-bright); border-radius: 20px; padding: 1.5vw 2vw; display: flex; flex-direction: column-reverse; box-shadow: 0 20px 50px rgba(0,0,0,0.9); width: 30vw; max-height: 90%; transform: scale(0.8); transition: transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        .modal-screen.active .ladder-container { transform: scale(1); }
+        .ladder-step { display: flex; justify-content: space-between; padding: 0.4vw 1.5vw; font-size: 1.1vw; font-weight: 600; color: var(--gold-dark); border-radius: 8px; margin: 1px 0; }
+        .ladder-step.safe { color: #fff; }
+        .ladder-step.current { background: var(--gold-bright); color: #000; font-weight: 800; box-shadow: 0 5px 15px rgba(0,0,0,0.5); transform: scale(1.08); z-index: 2;}
+        .ladder-step.dropped { background: var(--opt-wrong); color: #fff; font-weight: 800; box-shadow: 0 5px 15px rgba(0,0,0,0.5); transform: scale(1.08); z-index: 2;}
+        
+        .expl-container { background: var(--box-bg); border: 3px solid var(--gold-border); border-radius: 20px; padding: 3vw; text-align: center; max-width: 900px; width: 70%; box-shadow: 0 20px 50px rgba(0,0,0,0.9); transform: translateY(100px); transition: transform 0.5s ease; }
+        .modal-screen.active .expl-container { transform: translateY(0); }
+        .expl-title { font-size: 2.2vw; font-weight: 800; margin-bottom: 1.5vw; }
+        .expl-title.win { color: #014d20; text-shadow: 0 0 10px #00e676; } 
+        .expl-title.lose { color: #a30000; text-shadow: 0 0 10px #ff1744;} 
+        .expl-title.walk { color: var(--gold-bright); } 
+        .expl-text { font-size: 1.4vw; line-height: 1.5; color: var(--text-light); text-shadow: 0 2px 4px #000;}
+        
+        .cert-container { background: var(--box-bg); border: 0.8vw double var(--gold-border); border-radius: 10px; padding: 4vw; width: 75vw; text-align: center; color: var(--text-light); box-shadow: 0 20px 50px rgba(0,0,0,0.9); position: relative; }
+        .cert-title { font-size: 2.8vw; font-weight: 900; color: var(--gold-bright); margin-bottom: 1vw; border-bottom: 2px solid var(--gold-dark); display: inline-block; padding: 0 3vw; text-shadow: 0 2px 4px #000;}
+        .cert-text { font-size: 1.4vw; margin: 1vw 0; color: #e2e8f0; }
+        .cert-name { font-size: 3vw; font-weight: 800; color: #ffdf00; margin: 1.5vw 0; font-family: 'Poppins', sans-serif; text-shadow: 0 4px 8px #000;}
+        .cert-prize { font-size: 2vw; font-weight: bold; color: #00e676; margin-top: 1.5vw; text-shadow: 0 2px 4px #000; }
+        
+        .poll-container { background: var(--box-bg); border: 3px solid var(--gold-border); border-radius: 20px; padding: 3vw; width: 45vw; text-align: center; box-shadow: 0 20px 50px rgba(0,0,0,0.9);}
+        .poll-container h2 { color: var(--gold-bright); font-size: 1.8vw; margin-bottom: 1.5vw; text-shadow: 0 2px 4px #000;}
+        .bar-chart { display: flex; justify-content: space-around; align-items: flex-end; height: 20vw; border-bottom: 2px solid #555; padding-bottom: 1vw; }
+        .bar-group { display: flex; flex-direction: column; justify-content: flex-end; align-items: center; height: 100%; width: 5vw; background: rgba(255,255,255,0.05); border-radius: 5px 5px 0 0; position: relative;}
+        .bar-pct { position: absolute; top: -2.5vw; font-size: 1.1vw; font-weight: bold; width: 100%; text-align: center;}
+        .bar-fill { width: 100%; background: var(--gold-bright); border-radius: 5px 5px 0 0; transition: height 1.5s cubic-bezier(0.175, 0.885, 0.32, 1.275); height: 0%; box-shadow: inset 0 0 10px rgba(0,0,0,0.3);}
+        .bar-lbl { margin-top: 1vw; font-size: 1.4vw; font-weight: bold; color: var(--gold-bright); text-shadow: 0 2px 4px #000;}
+        
+        .expert-container, .fff-results-container, .call-container { background: var(--box-bg); border: 3px solid var(--gold-border); border-radius: 20px; padding: 3vw; width: 50vw; text-align: center; box-shadow: 0 20px 50px rgba(0,0,0,0.9);}
+        .expert-container h2, .fff-results-container h2, .call-container h2 { color: var(--gold-bright); font-size: 2vw; margin-bottom: 1.5vw; text-shadow: 0 2px 4px #000;}
+        .expert-profile { width: 25vw; height: 15vw; background: #000; border: 4px solid var(--gold-border); margin: 0 auto; display: flex; align-items: center; justify-content: center; font-size: 1.2vw; color: #888; border-radius: 10px;}
+        .fff-list { display: flex; flex-direction: column; gap: 1vw; }
+        .fff-list-item { background: rgba(0,0,0,0.5); border: 2px solid var(--gold-dark); padding: 1vw 2vw; border-radius: 10px; font-size: 1.4vw; font-weight: bold; display: flex; justify-content: space-between; }
+        .call-status { font-size: 1.4vw; font-weight: bold; color: #fff; margin-top: 1.5vw; animation: pulse 1.5s infinite;}
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    </style>
+</head>
+<body>
+    
+    <div class="projector-frame">
+        <div class="bg-rays"></div>
+
+        <div class="game-wrapper" id="main-game">
+            <div class="top-hud">
+                <div class="lifelines">
+                    <div class="lifeline-icon" id="ll-5050">50:50</div><div class="lifeline-icon" id="ll-poll">📊</div>
+                    <div class="lifeline-icon" id="ll-expert">💡</div><div class="lifeline-icon" id="ll-call">📞</div>
+                </div>
+                <div class="timer-container" id="timer-main">30</div>
+                <div style="width: 25vw;"></div> 
+            </div>
+            <div class="level-badge">Level 9: परिग्रह त्याग प्रतिमा</div>
+            <div class="question-box">जीव के कितने प्रकार हैं?</div>
+            <div class="options-grid">
+                <!-- Added "invisible" class so they hide by default until host reveals them -->
+                <div class="option-box invisible" id="opt-A"><span class="opt-lbl">A:</span><span class="opt-txt">दो</span></div>
+                <div class="option-box invisible" id="opt-B"><span class="opt-lbl">B:</span><span class="opt-txt">तीन</span></div>
+                <div class="option-box invisible" id="opt-C"><span class="opt-lbl">C:</span><span class="opt-txt">चार</span></div>
+                <div class="option-box invisible" id="opt-D"><span class="opt-lbl">D:</span><span class="opt-txt">पाँच</span></div>
+            </div>
+        </div>
+
+        <div class="game-wrapper" id="audience-q-mode">
+            <div class="top-hud">
+                <div style="width: 25vw;"></div><div class="timer-container" id="timer-aud" style="border-color:#d946ef; box-shadow: 0 0 40px rgba(217,70,239,0.6);">15</div><div style="width: 25vw;"></div> 
+            </div>
+            <div class="level-badge">📢 Audience Question</div>
+            <div class="question-box">वर्तमान चौबीसी के प्रथम तीर्थंकर कौन हैं?</div>
+            <div class="options-grid">
+                <div class="option-box" id="aud-opt-A"><span class="opt-lbl">A:</span><span class="opt-txt">भगवान महावीर</span></div>
+                <div class="option-box" id="aud-opt-B"><span class="opt-lbl">B:</span><span class="opt-txt">भगवान ऋषभदेव</span></div>
+                <div class="option-box" id="aud-opt-C"><span class="opt-lbl">C:</span><span class="opt-txt">भगवान पार्श्वनाथ</span></div>
+                <div class="option-box" id="aud-opt-D"><span class="opt-lbl">D:</span><span class="opt-txt">भगवान शान्तिनाथ</span></div>
+            </div>
+        </div>
+
+        <div class="game-wrapper" id="fff-mode">
+            <div class="timer-container" id="timer-fff" style="margin-bottom: 2vw;">20</div>
+            <div class="level-badge" style="background: #e65100; border-color: #ffb300; color: #fff;">⚡ Fastest Finger First</div>
+            <div class="question-box" style="font-size: 1.8vw;">प्रथम से चतुर्थ काल तक, इन्हें सही क्रम में लगाएँ:</div>
+            <div class="fff-grid">
+                <div class="fff-opt"><span class="opt-lbl">A:</span> तीसरा काल</div><div class="fff-opt"><span class="opt-lbl">B:</span> पहला काल</div>
+                <div class="fff-opt"><span class="opt-lbl">C:</span> चौथा काल</div><div class="fff-opt"><span class="opt-lbl">D:</span> दूसरा काल</div>
+            </div>
+        </div>
+
+        <!-- OVERLAYS -->
+        <div class="modal-screen" id="modal-ladder"><div class="ladder-container" id="ladder-build"></div></div>
+        <div class="modal-screen" id="modal-expl">
+            <div class="expl-container">
+                <div class="expl-title win" id="expl-title">सटीक उत्तर!</div>
+                <div class="expl-text">जिनागम में दो प्रकार के जीव कहे गये हैं - संसारी जीव और मुक्त जीव। तत्त्वार्थ सूत्र में सूत्र भी आया है 'संसारीणोमुक्ताश्च'</div>
+            </div>
+        </div>
+        <div class="modal-screen" id="modal-walkaway">
+            <div class="expl-container" style="border-color: var(--gold-bright);">
+                <div class="expl-title walk">खेल समाप्ति</div>
+                <div class="expl-text">श्री राहुल जैन ने समझदारी दिखाते हुए खेल को यहीं छोड़ने का निर्णय लिया है।<br><br><span style="color: #00e676; font-size: 2vw; font-weight: bold; display: block; margin-top: 1vw;">विजेता पद: सामायिक प्रतिमा</span></div>
+            </div>
+        </div>
+        <div class="modal-screen" id="modal-certificate">
+            <div class="cert-container">
+                <div class="cert-content">
+                    <div class="cert-title">प्रमाणपत्र</div><div class="cert-text">यह प्रमाणित किया जाता है कि</div><div class="cert-name">श्री राहुल जैन</div>
+                    <div class="cert-text">ने "कौन बनेगा सिद्धात्मा" में उत्कृष्ट प्रदर्शन करते हुए प्राप्त किया है:</div><div class="cert-prize">स्तर 14: सिद्ध परमात्मा</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="modal-screen" id="modal-poll">
+            <div class="poll-container">
+                <h2>Audience Poll Results</h2>
+                <div class="timer-container" id="timer-poll" style="margin: 0 auto 1.5vw auto; width: 6vw; height: 6vw; font-size: 2vw;">30</div>
+                <div class="bar-chart">
+                    <div class="bar-group"><div class="bar-pct" id="pct-A" style="opacity: 0;">75%</div><div class="bar-fill" id="bar-A"></div></div>
+                    <div class="bar-group"><div class="bar-pct" id="pct-B" style="opacity: 0;">10%</div><div class="bar-fill" id="bar-B"></div></div>
+                    <div class="bar-group"><div class="bar-pct" id="pct-C" style="opacity: 0;">5%</div><div class="bar-fill" id="bar-C"></div></div>
+                    <div class="bar-group"><div class="bar-pct" id="pct-D" style="opacity: 0;">10%</div><div class="bar-fill" id="bar-D"></div></div>
+                </div>
+                <div style="display:flex; justify-content:space-around; padding: 0 10px;">
+                    <div class="bar-lbl">A</div><div class="bar-lbl">B</div><div class="bar-lbl">C</div><div class="bar-lbl">D</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="modal-screen" id="modal-expert">
+            <div class="expert-container">
+                <h2>💡 विशेषज्ञ की राय (Expert Advice)</h2>
+                <div class="expert-profile">[Expert Video/Image Here]</div>
+                <h3 style="margin-top: 1vw; color: #fff;">Shri Vidhyasagar Ji Maharaj</h3>
+            </div>
+        </div>
+
+        <div class="modal-screen" id="modal-call">
+            <div class="call-container">
+                <h2>📞 फोन अ फ्रेंड (Phone-A-Friend)</h2>
+                <div class="timer-container" id="timer-call" style="margin: 0 auto; width: 10vw; height: 10vw; font-size: 3vw;">60</div>
+                <div class="call-status">Calling Rahul's Friend...</div>
+            </div>
+        </div>
+
+        <div class="modal-screen" id="modal-fff-results">
+            <div class="fff-results-container">
+                <h2>⚡ FFF Leaderboard</h2>
+                <div class="fff-list">
+                    <div class="fff-list-item winner"><span>1. Ankit Sharma</span> <span>3.42s</span></div>
+                    <div class="fff-list-item"><span>2. Priya Jain</span> <span>4.10s</span></div>
+                </div>
+            </div>
+        </div>
+    </div> 
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyBvFw7TNlflcBbms-K4sk_jrqgdzYYJKok",
+            authDomain: "kounbanegasiddhatma.firebaseapp.com",
+            databaseURL: "https://kounbanegasiddhatma-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "kounbanegasiddhatma",
+            storageBucket: "kounbanegasiddhatma.firebasestorage.app",
+            messagingSenderId: "53011686572",
+            appId: "1:53011686572:web:f9b02eb2aed988c9ed6b09"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+
+        const ladderStages = ["दर्शन प्रतिमा", "व्रत प्रतिमा", "सामायिक प्रतिमा", "प्रोषधोपवास प्रतिमा", "सचित्त त्याग प्रतिमा", "रात्रिभुक्ति त्याग प्रतिमा", "ब्रह्मचर्य प्रतिमा", "आरम्भ त्याग प्रतिमा", "परिग्रह त्याग प्रतिमा", "अनुमति त्याग प्रतिमा", "उद्दिष्ट त्याग प्रतिमा", "भावलिंगी संत", "अरिहंत परमात्मा", "सिद्ध परमात्मा"];
+        function initLadder() {
+            const container = document.getElementById('ladder-build');
+            for (let i = 0; i < ladderStages.length; i++) {
+                let div = document.createElement('div');
+                div.className = 'ladder-step';
+                if(i+1 === 7 || i+1 === 12 || i+1 === 14) div.classList.add('safe');
+                div.id = `lad-${i+1}`;
+                div.innerHTML = `<span>${i+1}</span> <span>${ladderStages[i]}</span>`;
+                container.appendChild(div);
+            }
+        }
+        initLadder();
+
+        // --- NEW: ROBUST TIMEOUT CLEARING SYSTEM ---
+        // This prevents animations from overlapping if host clicks buttons quickly
+        let activeTimeouts = [];
+        function safeTimeout(fn, delay) {
+            let id = setTimeout(fn, delay);
+            activeTimeouts.push(id);
+        }
+        function clearAllTimeouts() {
+            activeTimeouts.forEach(id => clearTimeout(id));
+            activeTimeouts = [];
+        }
+
+        // Updated closeModals to clear animations
+        function closeModals() {
+            clearAllTimeouts(); // Stop any pending ladder or correct/wrong animations
+            document.querySelectorAll('.modal-screen').forEach(m => m.classList.remove('active'));
+            ['A','B','C','D'].forEach(opt => { document.getElementById(`bar-${opt}`).style.height = '0%'; document.getElementById(`pct-${opt}`).style.opacity = '0'; });
+        }
+        
+        // Updated clearOptions to also re-hide options when a new question is shown
+        function clearOptions(hideCompletely = false) {
+            ['A','B','C','D'].forEach(opt => { 
+                let el = document.getElementById(`opt-${opt}`);
+                el.className = 'option-box'; 
+                if (hideCompletely) el.classList.add('invisible');
+            });
+        }
+
+        // --- TIMERS ---
+        let activeTimerInterval = null;
+        function startCountdown(elementId, seconds) {
+            clearInterval(activeTimerInterval); 
+            const el = document.getElementById(elementId);
+            if(!el) return;
+            
+            let timeLeft = seconds;
+            el.innerText = timeLeft; 
+            
+            activeTimerInterval = setInterval(() => {
+                timeLeft--;
+                if(timeLeft <= 0) {
+                    clearInterval(activeTimerInterval);
+                    el.innerText = "0";
+                } else {
+                    el.innerText = timeLeft;
+                }
+            }, 1000);
+        }
+
+        let isInitialLoad = true;
+
+        db.ref('host_commands').on('value', (snapshot) => {
+            const data = snapshot.val();
+            if (!data) return;
+            if (isInitialLoad) { isInitialLoad = false; return; }
+
+            console.log("New Command:", data);
+
+            // 1. SCREEN COMMANDS
+            if (data.type === 'screen') {
+                closeModals();
+                document.getElementById('main-game').style.display = 'none';
+                document.getElementById('fff-mode').style.display = 'none';
+                document.getElementById('audience-q-mode').style.display = 'none';
+
+                if (data.value === 'main_game') { 
+                    document.getElementById('main-game').style.display = 'flex'; 
+                    clearOptions(true); // Hide options until host reveals them!
+                }
+                if (data.value === 'fff_mode') { document.getElementById('fff-mode').style.display = 'flex'; }
+                if (data.value === 'audience_q') { document.getElementById('audience-q-mode').style.display = 'flex'; }
+            }
+            
+            // 2. REVEAL OPTIONS
+            if (data.type === 'action' && data.value === 'reveal_options') {
+                closeModals();
+                clearOptions(false); // Removes the 'invisible' class
+            }
+
+            // 3. LOCK OPTIONS
+            if (data.type === 'locked_option') {
+                clearOptions(false);
+                document.getElementById(`opt-${data.value}`).classList.add('locked');
+            }
+
+            // 4. LIFELINES
+            if (data.type === 'lifeline') {
+                if (data.value === '5050') {
+                    document.getElementById('opt-C').classList.add('hidden');
+                    document.getElementById('opt-D').classList.add('hidden');
+                }
+                if (data.value === 'poll') {
+                    closeModals();
+                    document.getElementById('modal-poll').classList.add('active');
+                }
+                if (data.value === 'expert') { closeModals(); document.getElementById('modal-expert').classList.add('active'); }
+                if (data.value === 'call') { closeModals(); document.getElementById('modal-call').classList.add('active'); }
+            }
+
+            // 5. ANIMATIONS & REVEALS
+            if (data.type === 'action') {
+                if (data.value === 'correct_ans') {
+                    closeModals(); // Clears any overlapping states
+                    document.getElementById('opt-A').classList.add('correct');
+                    safeTimeout(() => { 
+                        document.getElementById('modal-ladder').classList.add('active'); 
+                        document.querySelectorAll('.ladder-step').forEach(l => l.classList.remove('current', 'dropped')); 
+                        document.getElementById('lad-9').classList.add('current'); 
+                    }, 2500);
+                }
+                if (data.value === 'wrong_ans') {
+                    closeModals();
+                    document.getElementById('opt-B').classList.remove('locked'); document.getElementById('opt-B').classList.add('wrong');
+                    safeTimeout(() => { 
+                        document.getElementById('modal-ladder').classList.add('active'); 
+                        document.querySelectorAll('.ladder-step').forEach(l => l.classList.remove('current', 'dropped')); 
+                        document.getElementById('lad-7').classList.add('dropped'); 
+                    }, 2500);
+                    safeTimeout(() => { 
+                        document.getElementById('modal-ladder').classList.remove('active'); 
+                        document.getElementById('opt-A').classList.add('correct'); 
+                    }, 5000);
+                }
+                if (data.value === 'show_explanation') { closeModals(); document.getElementById('modal-expl').classList.add('active'); }
+                if (data.value === 'walk_away') { closeModals(); document.getElementById('modal-walkaway').classList.add('active'); }
+                if (data.value === 'show_certificate') { closeModals(); document.getElementById('modal-certificate').classList.add('active'); }
+                if (data.value === 'show_fff_results') { closeModals(); document.getElementById('modal-fff-results').classList.add('active'); }
+            }
+
+            // 6. TIMERS 
+            if (data.type === 'timer') {
+                if (data.value === 'reset_main') { startCountdown('timer-main', 30); }
+                if (data.value === 'start_call') { startCountdown('timer-call', 60); }
+                if (data.value === 'start_poll') { startCountdown('timer-poll', 30); }
+                if (data.value === 'pause' || data.value === 'stop_expert') { clearInterval(activeTimerInterval); }
+            }
+        });
+    </script>
+</body>
+</html>

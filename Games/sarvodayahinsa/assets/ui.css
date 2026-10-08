@@ -1,0 +1,538 @@
+﻿/* ── सर्वोदय अहिंसा — shared shell ─────────────────────────────────
+   Not one colour is written literally below. Everything comes from the
+   variables theme.js sets, so the same stylesheet serves a gold quiz,
+   a neon tambola and anything built later.                             */
+
+@import url('https://fonts.googleapis.com/css2?family=Mukta:wght@400;600;700;800&family=Poppins:wght@600;700;800&family=Noto+Sans+Devanagari:wght@400;600;700&display=swap');
+
+:root{
+  /* fallbacks only — theme.js overwrites these on the first paint */
+  --bg:#070b16; --bg-deep:#050811; --panel:#0e1526; --panel-2:#141d33;
+  --bd:#1c2840; --bd-lt:#2b3c60; --tx:#f1f5f9; --tx-mut:#8b9ab5;
+  --primary:#ffcf2e; --primary-dk:#9a6f08; --primary-lt:#ffe89a; --on-primary:#0b0b0f;
+  --glow:rgba(255,207,46,.22); --glow-hard:rgba(255,207,46,.55);
+  --accent:#2f6bff; --on-accent:#fff; --accent-glow:rgba(47,107,255,.25);
+  --ok:#10b981; --bad:#ef4444; --ok-glow:rgba(16,185,129,.22); --bad-glow:rgba(239,68,68,.22);
+
+  --r:14px; --r-sm:9px; --r-lg:22px;
+  --sp:14px;
+
+  /* Devanagari is the reason these stacks are this long.
+     Poppins and most Latin faces carry no Devanagari, and the generic
+     `sans-serif` on Windows resolves to a font that drops or doubles
+     matras — "शामिल" comes out as "शाामल". So every stack names real
+     Devanagari fonts that are ALREADY on the machine (Nirmala UI ships
+     with Windows, Kohinoor with macOS) before it ever reaches the
+     generic. A projector with slow or blocked internet then still
+     renders Hindi correctly instead of mangling it mid-show. */
+  --dev:'Noto Sans Devanagari','Nirmala UI','Kohinoor Devanagari','Mangal','Kokila',sans-serif;
+  --fs:'Mukta',var(--dev);
+  --fd:'Poppins','Mukta',var(--dev);
+  --shadow:0 10px 30px rgba(0,0,0,.35);
+  --t:.18s cubic-bezier(.4,0,.2,1);
+}
+
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  background:var(--bg);
+  color:var(--tx);
+  font-family:var(--fs);
+  font-size:16px;
+  line-height:1.55;
+  -webkit-font-smoothing:antialiased;
+  overflow-x:hidden;
+}
+/* the aurora behind everything — cheap, and it makes a flat hall screen look alive */
+body::before{
+  content:'';position:fixed;inset:0;z-index:-1;pointer-events:none;
+  background:
+    radial-gradient(60vw 60vw at 12% -10%, var(--glow), transparent 60%),
+    radial-gradient(50vw 50vw at 105% 15%, var(--accent-glow), transparent 60%),
+    linear-gradient(180deg, var(--bg), var(--bg-deep));
+}
+
+h1,h2,h3,h4{font-family:var(--fd);line-height:1.2;font-weight:800}
+a{color:var(--primary);text-decoration:none}
+a:hover{text-decoration:underline}
+
+/* ─── layout ─────────────────────────────────────────────────── */
+.wrap{width:min(1240px,100% - 32px);margin-inline:auto}
+.row{display:flex;gap:var(--sp);align-items:center}
+.row.wrap-r{flex-wrap:wrap}
+.col{display:flex;flex-direction:column;gap:var(--sp)}
+.grow{flex:1;min-width:0}
+.spread{display:flex;justify-content:space-between;align-items:center;gap:var(--sp)}
+.grid{display:grid;gap:var(--sp)}
+.g2{grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
+.g3{grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
+.center{display:grid;place-items:center}
+.hide{display:none !important}
+.mut{color:var(--tx-mut)}
+.sm{font-size:13px}
+.xs{font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;font-weight:700}
+.nowrap{white-space:nowrap}
+.tc{text-align:center}
+
+/* ─── surfaces ───────────────────────────────────────────────── */
+.card{
+  background:var(--panel);
+  border:1px solid var(--bd);
+  border-radius:var(--r);
+  padding:18px;
+  box-shadow:var(--shadow);
+}
+.card.flat{box-shadow:none}
+.card.tight{padding:12px}
+.sub{background:var(--panel-2);border:1px solid var(--bd);border-radius:var(--r-sm);padding:12px}
+
+/* The header lives inside a wrapper div that is exactly as tall as the
+   header itself. A sticky element can only stick while its containing
+   block is still on screen, so sticking the header alone did nothing —
+   it scrolled away with its own wrapper. The WRAPPER has to be sticky. */
+#hdr-slot-outer{position:sticky;top:0;z-index:40}
+.hdr{
+  background:color-mix(in srgb, var(--panel) 92%, transparent);
+  backdrop-filter:blur(14px);
+  border-bottom:1px solid var(--bd);
+}
+.hdr .in{display:flex;align-items:center;gap:12px;padding:10px 16px}
+.logo{height:38px;width:auto;border-radius:8px;flex:none}
+.brand-n{font-family:var(--fd);font-weight:800;font-size:17px;letter-spacing:.2px;line-height:1.1}
+.brand-s{font-size:11px;color:var(--tx-mut);letter-spacing:.14em;text-transform:uppercase}
+
+/* Page switcher in the header — direct children only.
+
+   Each item wraps its text in an inner <span class="lbl">, so a plain
+   ".hdr-nav span" matched that inner span too and painted the label
+   --tx-mut straight over the active chip's own colour. The icon took the
+   right colour and the word beside it did not, which is what made the
+   current page unreadable whatever the theme. */
+.hdr-nav{display:flex;gap:3px;margin-left:14px;flex-wrap:wrap}
+.hdr-nav > a,.hdr-nav > span{
+  display:inline-flex;align-items:center;gap:6px;
+  padding:7px 11px;border-radius:var(--r-sm);
+  font:700 13px/1 var(--fd);color:var(--tx-mut);
+  text-decoration:none;border:1px solid transparent;transition:var(--t);white-space:nowrap;
+}
+.hdr-nav .lbl{color:inherit}
+.hdr-nav > a:hover{color:var(--tx);background:var(--panel-2);text-decoration:none}
+.hdr-nav > span.on{color:var(--on-primary);background:var(--primary)}
+/* on a laptop the labels fit; on a narrow screen the icons carry it */
+@media(max-width:1100px){ .hdr-nav .lbl{display:none} .hdr-nav > a,.hdr-nav > span{padding:7px 9px} }
+@media(max-width:560px){ .hdr-nav{margin-left:6px;gap:1px} }
+
+/* ─── buttons ────────────────────────────────────────────────── */
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  padding:11px 16px;border-radius:var(--r-sm);
+  border:1px solid var(--bd-lt);
+  background:var(--panel-2);color:var(--tx);
+  font-family:var(--fd);font-weight:700;font-size:14px;
+  cursor:pointer;transition:var(--t);
+  user-select:none;white-space:nowrap;
+}
+.btn:hover:not(:disabled){border-color:var(--primary);transform:translateY(-1px)}
+.btn:active:not(:disabled){transform:translateY(0)}
+.btn:disabled{opacity:.42;cursor:not-allowed}
+.btn.p{background:linear-gradient(135deg,var(--primary),var(--primary-dk));color:var(--on-primary);border-color:transparent;box-shadow:0 6px 18px var(--glow)}
+.btn.a{background:var(--accent);color:var(--on-accent);border-color:transparent}
+.btn.ok{background:var(--ok);color:#03150e;border-color:transparent}
+.btn.bad{background:var(--bad);color:#fff;border-color:transparent}
+.btn.ghost{background:transparent}
+.btn.big{padding:16px 26px;font-size:17px;border-radius:var(--r)}
+.btn.sm{padding:7px 11px;font-size:12.5px}
+.btn.wide{width:100%}
+.btn.on{border-color:var(--primary);box-shadow:inset 0 0 0 1px var(--primary),0 0 16px var(--glow)}
+
+.kbd{
+  display:inline-grid;place-items:center;min-width:19px;height:19px;padding:0 4px;
+  font:700 11px/1 var(--fd);border-radius:5px;
+  background:var(--bg-deep);border:1px solid var(--bd-lt);color:var(--tx-mut);
+}
+
+/* ─── form ───────────────────────────────────────────────────── */
+label.f{display:block;font-size:12px;font-weight:700;color:var(--tx-mut);margin-bottom:5px;letter-spacing:.04em}
+/* tel belongs here too — the join form's mobile field was the one input
+   on the site still wearing the browser's own white box */
+input[type=text],input[type=number],input[type=email],input[type=password],
+input[type=search],input[type=tel],input[type=url],textarea,select{
+  width:100%;padding:11px 13px;
+  background:var(--bg-deep);color:var(--tx);
+  border:1px solid var(--bd);border-radius:var(--r-sm);
+  font-family:var(--fs);font-size:15px;transition:var(--t);
+}
+input:focus,textarea:focus,select:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px var(--glow)}
+textarea{resize:vertical;min-height:76px;line-height:1.5}
+select{cursor:pointer}
+input[type=color]{width:46px;height:34px;padding:2px;border-radius:8px;border:1px solid var(--bd);background:var(--bg-deep);cursor:pointer}
+input[type=range]{width:100%;accent-color:var(--primary)}
+.chk{display:flex;align-items:center;gap:9px;cursor:pointer;font-size:14px;user-select:none}
+.chk input{width:17px;height:17px;accent-color:var(--primary);cursor:pointer;flex:none}
+
+/* ─── pills / badges ─────────────────────────────────────────── */
+.pill{
+  display:inline-flex;align-items:center;gap:6px;
+  padding:4px 11px;border-radius:999px;
+  font:700 11.5px/1.7 var(--fd);letter-spacing:.05em;
+  background:var(--panel-2);border:1px solid var(--bd);color:var(--tx-mut);
+}
+.pill.p{background:var(--glow);border-color:var(--primary);color:var(--primary)}
+.pill.ok{background:var(--ok-glow);border-color:var(--ok);color:var(--ok)}
+.pill.bad{background:var(--bad-glow);border-color:var(--bad);color:var(--bad)}
+.pill.a{background:var(--accent-glow);border-color:var(--accent);color:var(--accent)}
+
+.dot{width:8px;height:8px;border-radius:50%;background:var(--tx-mut);flex:none}
+.dot.live{background:var(--ok);box-shadow:0 0 0 0 var(--ok-glow);animation:pulse 2s infinite}
+.dot.off{background:var(--bad)}
+@keyframes pulse{0%{box-shadow:0 0 0 0 var(--ok-glow)}70%{box-shadow:0 0 0 9px transparent}100%{box-shadow:0 0 0 0 transparent}}
+
+/* ─── selectable row (game lists, session lists, venues) ─────── */
+.gitem{
+  display:flex;align-items:center;gap:10px;
+  padding:10px 12px;border-radius:var(--r-sm);
+  background:var(--panel-2);border:1px solid var(--bd);
+  cursor:pointer;transition:var(--t);text-align:left;width:100%;
+  color:var(--tx);font-family:var(--fs);
+}
+.gitem:hover{border-color:var(--primary);transform:translateY(-1px)}
+.gitem.on{border-color:var(--primary);background:var(--glow)}
+.gitem .ic{font-size:19px;flex:none}
+.gitem .t{font-weight:700;font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ─── tabs ───────────────────────────────────────────────────── */
+.tabs{display:flex;gap:4px;background:var(--bg-deep);padding:4px;border-radius:var(--r-sm);border:1px solid var(--bd);overflow-x:auto}
+.tabs button{
+  flex:1;padding:9px 13px;border:0;border-radius:6px;background:transparent;color:var(--tx-mut);
+  font-family:var(--fd);font-weight:700;font-size:13px;cursor:pointer;transition:var(--t);white-space:nowrap;
+}
+.tabs button.on{background:var(--primary);color:var(--on-primary)}
+.tabs button:hover:not(.on){color:var(--tx)}
+
+/* ─── option buttons (quiz / MCQ) — shared by screen and phone ─── */
+.opt{
+  display:flex;align-items:center;gap:13px;
+  padding:14px 16px;border-radius:var(--r);
+  background:var(--panel-2);border:2px solid var(--bd);
+  cursor:pointer;transition:var(--t);text-align:left;width:100%;
+  font-family:var(--fs);font-size:17px;color:var(--tx);
+}
+.opt:hover:not(:disabled):not(.locked):not(.correct){border-color:var(--primary);transform:translateX(3px)}
+.opt:disabled{cursor:default}
+.opt .lbl{
+  flex:none;width:34px;height:34px;display:grid;place-items:center;border-radius:9px;
+  background:var(--bg-deep);border:1px solid var(--bd-lt);
+  font:800 15px/1 var(--fd);color:var(--primary);
+}
+.opt.locked{border-color:var(--primary);background:var(--glow);box-shadow:0 0 22px var(--glow)}
+.opt.locked .lbl{background:var(--primary);color:var(--on-primary);border-color:transparent}
+.opt.correct{border-color:var(--ok);background:var(--ok-glow);box-shadow:0 0 26px var(--ok-glow)}
+.opt.correct .lbl{background:var(--ok);color:#03150e;border-color:transparent}
+.opt.wrong{border-color:var(--bad);background:var(--bad-glow)}
+.opt.wrong .lbl{background:var(--bad);color:#fff;border-color:transparent}
+.opt.dim{opacity:.25;pointer-events:none}
+
+/* ─── timer ──────────────────────────────────────────────────── */
+.timer{
+  display:inline-grid;place-items:center;
+  width:74px;height:74px;border-radius:50%;
+  font:800 27px/1 var(--fd);color:var(--primary);
+  background:var(--bg-deep);border:3px solid var(--primary);
+  box-shadow:0 0 22px var(--glow);
+}
+.timer.warn{color:var(--bad);border-color:var(--bad);box-shadow:0 0 22px var(--bad-glow);animation:tick .8s infinite}
+@keyframes tick{50%{transform:scale(1.07)}}
+.tbar{height:7px;border-radius:99px;background:var(--bg-deep);overflow:hidden;border:1px solid var(--bd)}
+.tbar i{display:block;height:100%;background:linear-gradient(90deg,var(--primary),var(--accent));transition:width .25s linear}
+
+/* ─── tables / lists ─────────────────────────────────────────── */
+.lb{display:flex;flex-direction:column;gap:7px}
+.lb .r{
+  display:flex;align-items:center;gap:12px;
+  padding:10px 13px;border-radius:var(--r-sm);
+  background:var(--panel-2);border:1px solid var(--bd);
+  min-width:0;
+}
+/* Without min-width:0 a long name refuses to shrink and pushes the score
+   out of the card — which is how the host panel ended up showing eight
+   names where ten had been asked for. */
+.lb .r .nm{min-width:0;overflow:hidden}
+.lb .r .nm b{
+  display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.lb .r .n{
+  flex:none;width:28px;height:28px;display:grid;place-items:center;border-radius:7px;
+  background:var(--bg-deep);font:800 13px/1 var(--fd);color:var(--tx-mut);
+}
+/* the row that is you, on your own phone */
+.lb .r.mine{border-color:var(--primary);background:var(--glow)}
+.lb .r:nth-child(1) .n{background:var(--primary);color:var(--on-primary)}
+.lb .r:nth-child(2) .n{background:var(--bd-lt);color:var(--tx)}
+.lb .r:nth-child(3) .n{background:var(--primary-dk);color:var(--tx)}
+.lb .r .s{flex:none;margin-left:auto;font:800 16px/1 var(--fd);color:var(--primary)}
+
+/* ─── the audience's own score sheet ──────────────────────────
+   A phone in a hall has no room for a permanent leaderboard, so it
+   lives behind one button and slides up over the round when asked. */
+.sheet{
+  position:fixed;inset:0;z-index:60;display:flex;flex-direction:column;justify-content:flex-end;
+  background:rgba(0,0,0,.55);backdrop-filter:blur(3px);
+}
+.sheet .panel-in{
+  background:var(--panel);border-top:1px solid var(--bd-lt);
+  border-radius:var(--r) var(--r) 0 0;
+  padding:14px 14px calc(16px + env(safe-area-inset-bottom));
+  max-height:82vh;display:flex;flex-direction:column;gap:11px;
+  animation:sheetup .26s cubic-bezier(.2,.9,.3,1) both;
+}
+@keyframes sheetup{from{transform:translateY(100%)}}
+.sheet .scroll{overflow:auto;-webkit-overflow-scrolling:touch}
+.tabs{display:flex;gap:6px;background:var(--bg-deep);padding:4px;border-radius:var(--r-sm)}
+.tabs button{
+  flex:1;padding:9px 6px;border:0;border-radius:calc(var(--r-sm) - 3px);
+  background:transparent;color:var(--tx-mut);
+  font:700 13px/1.2 var(--fd);cursor:pointer;transition:var(--t);
+}
+.tabs button.on{background:var(--primary);color:var(--on-primary)}
+
+/* the score the audience keeps an eye on — never allowed to be squeezed
+   out of the top bar by a long game title */
+.me{flex:none}
+
+/* ─── match the pairs ─────────────────────────────────────────
+   One photo box, three sizes: a thumbnail in the Studio, a row on a
+   phone, a tile on the projector. The picture is a background so that
+   "fill the box" and "show the whole picture" are one property. */
+.mph{
+  width:100%;aspect-ratio:1/1;border-radius:var(--r-sm);
+  background:var(--bg-deep) center/cover no-repeat;
+  border:1px solid var(--bd-lt);
+  display:grid;place-items:center;text-align:center;overflow:hidden;
+}
+.mrow{
+  display:flex;align-items:center;gap:11px;padding:8px 11px;
+  border-radius:var(--r-sm);background:var(--panel-2);border:1px solid var(--bd);
+  min-width:0;transition:var(--t);
+}
+.mrow .mph{width:58px;height:58px;flex:none;aspect-ratio:auto}
+.mrow .grow{min-width:0;overflow:hidden}
+.mrow .tag{
+  flex:none;width:24px;height:24px;display:grid;place-items:center;border-radius:6px;
+  background:var(--bg-deep);font:800 12px/1 var(--fd);color:var(--tx-mut);
+}
+.mrow.tap{cursor:pointer}
+.mrow.tap:hover{border-color:var(--bd-lt)}
+.mrow.on{border-color:var(--primary);background:var(--glow);box-shadow:0 0 18px var(--glow)}
+.mrow.filled{border-color:var(--bd-lt)}
+.mrow.ok{border-color:var(--ok);background:var(--ok-glow)}
+.mrow.bad{border-color:var(--bad);background:var(--bad-glow)}
+
+/* --- phone: photos one side, names the other ---
+   The same shape as the projector, so somebody glancing up from their
+   phone is looking at the same puzzle. */
+.mpair{display:grid;grid-template-columns:minmax(0,98px) minmax(0,1fr);gap:10px;align-items:stretch}
+.mcol-ph{display:grid;gap:8px;grid-auto-rows:minmax(0,1fr);min-width:0}
+/* The names are deliberately NOT level with the photos. Lining them up
+   one for one reads as "photo 1 goes with name A", which is the single
+   thing this puzzle must never suggest — so they are spaced to fall
+   between the photo rows instead. */
+.mcol-nm{display:flex;flex-direction:column;justify-content:center;gap:9px;min-width:0}
+.mname-b{min-height:50px;flex:none}
+
+.mpick{
+  position:relative;display:grid;padding:0;width:100%;min-height:0;overflow:hidden;
+  border:2px solid var(--bd);border-radius:var(--r-sm);background:var(--bg-deep);
+  cursor:pointer;transition:var(--t);
+}
+.mpick .im{display:block;width:100%;height:100%;min-height:74px;background:center/cover no-repeat}
+.mpick:hover:not(:disabled){border-color:var(--bd-lt)}
+.mpick.on{border-color:var(--primary);box-shadow:0 0 0 3px var(--glow)}
+.mpick.set{border-color:var(--ok)}
+.mpick:disabled{opacity:.6;cursor:default}
+.mpick .no{
+  position:absolute;top:4px;left:4px;padding:0 4px;
+  min-width:20px;height:20px;display:grid;place-items:center;border-radius:6px;
+  background:rgba(0,0,0,.62);color:#fff;font:800 11px/1 var(--fd);
+}
+.mpick .let{
+  position:absolute;right:4px;bottom:4px;
+  min-width:24px;height:24px;display:grid;place-items:center;border-radius:7px;
+  background:var(--ok);color:#03150e;font:800 13px/1 var(--fd);
+  box-shadow:0 2px 10px rgba(0,0,0,.4);
+}
+
+/* --- the Studio's pair editor ---
+   The tile is the button. Clicking anywhere on it opens the file picker
+   because it is a <label> wrapping a hidden input, and a photo can also
+   be dropped straight onto it. The old row put a "Choose a photo" button
+   under a 96px tile, where its own label did not fit. */
+.pair-row{
+  display:grid;grid-template-columns:112px minmax(0,1fr) auto;gap:13px;align-items:start;
+  padding:11px;border-radius:var(--r-sm);
+  background:var(--panel-2);border:1px solid var(--bd);transition:var(--t);
+}
+.pair-row.ready{border-color:color-mix(in srgb,var(--ok) 50%,var(--bd))}
+.drop{
+  position:relative;display:grid;place-items:center;text-align:center;
+  width:112px;aspect-ratio:1;border-radius:var(--r-sm);
+  border:2px dashed var(--bd-lt);background:var(--bg-deep) center/cover no-repeat;
+  cursor:pointer;overflow:hidden;transition:var(--t);
+}
+.drop:hover{border-color:var(--primary);box-shadow:0 0 0 3px var(--glow)}
+.drop.has{border-style:solid}
+.drop.over{border-color:var(--primary);background-color:var(--glow)}
+.drop .plus{display:block;font:300 32px/1 var(--fd);color:var(--primary)}
+.drop .cap{display:block;font-size:10.5px;line-height:1.3;color:var(--tx-mut);margin-top:5px;padding:0 8px}
+.drop .num{
+  position:absolute;top:5px;left:5px;z-index:2;padding:0 5px;
+  min-width:22px;height:22px;display:grid;place-items:center;border-radius:6px;
+  background:var(--primary);color:var(--on-primary);font:800 11px/1 var(--fd);
+}
+.drop .swap{
+  position:absolute;left:0;right:0;bottom:0;padding:5px 4px;
+  background:rgba(0,0,0,.6);color:#fff;
+  font:700 9.5px/1.3 var(--fd);letter-spacing:.08em;text-transform:uppercase;
+  opacity:0;transition:var(--t);
+}
+.drop.has:hover .swap{opacity:1}
+.pair-row .kb{align-self:center;font-size:10.5px;color:var(--tx-mut)}
+
+/* a quieter button than .btn.sm, for the second-rank actions on a row */
+.chip{
+  padding:4px 9px;border-radius:999px;cursor:pointer;
+  background:transparent;border:1px solid var(--bd-lt);color:var(--tx-mut);
+  font:700 11px/1.4 var(--fd);transition:var(--t);white-space:nowrap;
+}
+.chip:hover{border-color:var(--primary);color:var(--tx)}
+@media(max-width:560px){
+  .pair-row{grid-template-columns:86px minmax(0,1fr) auto;gap:10px;padding:9px}
+  .drop{width:86px}
+}
+
+/* Projector: photos on the left, names on the right. Everything is sized
+   off the stage rather than off the pictures — four portrait photos must
+   not push the names off the bottom of a hall screen, so every row is
+   minmax(0,1fr) and the tiles shrink to whatever is left. */
+.mgrid{
+  display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);
+  gap:2vw;flex:1;min-height:0;
+}
+.mcol{display:grid;gap:1.2vh;min-height:0;min-width:0}
+.mcol.photos{grid-auto-rows:minmax(0,1fr)}
+.mcol.names{align-content:center;grid-auto-rows:max-content}
+.mcard{position:relative;min-height:0;min-width:0}
+.mcard .mph.big{height:100%;aspect-ratio:auto;min-height:0}
+.mcard .tag,.mname .tag{
+  position:absolute;top:6px;left:6px;z-index:2;
+  min-width:clamp(22px,2vw,34px);height:clamp(22px,2vw,34px);
+  display:grid;place-items:center;border-radius:7px;padding:0 5px;
+  background:var(--primary);color:var(--on-primary);font:800 clamp(12px,1.2vw,19px)/1 var(--fd);
+}
+.mcard .pair{
+  position:absolute;right:6px;bottom:6px;z-index:2;
+  min-width:clamp(24px,2.2vw,38px);height:clamp(24px,2.2vw,38px);
+  display:grid;place-items:center;border-radius:8px;
+  background:var(--ok);color:#03150e;font:800 clamp(13px,1.3vw,21px)/1 var(--fd);
+  box-shadow:0 0 20px var(--ok-glow);
+}
+.mname{
+  position:relative;display:flex;align-items:center;gap:10px;
+  padding:clamp(8px,1.1vh,16px) clamp(10px,1vw,18px) clamp(8px,1.1vh,16px) clamp(40px,3.6vw,58px);
+  border-radius:var(--r-sm);background:var(--panel-2);border:1px solid var(--bd);
+  font:700 clamp(14px,1.5vw,26px)/1.35 var(--fs);
+}
+.mname .tag{position:absolute;top:50%;left:8px;transform:translateY(-50%)}
+@media(max-width:700px){ .mgrid{grid-template-columns:1fr} }
+
+/* ─── table ───────────────────────────────────────────────────
+   Used by the audience record, which is the one place the host sees
+   mobile numbers and ages. Header sticks so a long list stays legible. */
+.tbl{width:100%;border-collapse:collapse;font-size:13.5px}
+.tbl th,.tbl td{padding:8px 11px;text-align:left;white-space:nowrap}
+.tbl th{
+  position:sticky;top:0;z-index:1;
+  background:var(--panel-2);border-bottom:1px solid var(--bd);
+  font:700 11px/1 var(--fd);color:var(--tx-mut);
+  letter-spacing:.06em;text-transform:uppercase;
+}
+.tbl tbody tr{border-bottom:1px solid var(--bd)}
+.tbl tbody tr:last-child{border-bottom:0}
+.tbl tbody tr:hover{background:var(--panel-2)}
+
+/* ─── toast ──────────────────────────────────────────────────── */
+#toast{
+  position:fixed;left:50%;bottom:26px;
+  /* Hiding it with a percentage of its own height is not enough to clear
+     the 26px offset — a sliver of the pill stays poking up at the bottom
+     of every page, including the projector. Move it its full height PLUS
+     the offset, and hide it outright as well. */
+  transform:translate(-50%,calc(100% + 40px));
+  opacity:0;visibility:hidden;
+  z-index:9999;max-width:min(520px,92vw);
+  padding:12px 20px;border-radius:999px;
+  background:var(--panel);border:1px solid var(--primary);color:var(--tx);
+  font-weight:700;font-size:14px;box-shadow:var(--shadow);
+  transition:transform .3s cubic-bezier(.2,1.3,.4,1), opacity .2s linear, visibility .3s;
+  pointer-events:none;text-align:center;
+}
+#toast.show{transform:translate(-50%,0);opacity:1;visibility:visible}
+#toast.err{border-color:var(--bad);color:var(--bad)}
+
+/* ─── modal / gate ───────────────────────────────────────────── */
+.ovl{
+  position:fixed;inset:0;z-index:200;display:grid;place-items:center;padding:20px;
+  background:rgba(3,5,12,.82);backdrop-filter:blur(7px);
+}
+.ovl .box{width:min(460px,100%);max-height:90vh;overflow:auto;animation:pop .25s cubic-bezier(.2,1.3,.4,1)}
+.ovl .box.wide{width:min(860px,100%)}
+@keyframes pop{from{opacity:0;transform:translateY(14px) scale(.97)}}
+
+.spin{
+  width:34px;height:34px;border-radius:50%;
+  border:3px solid var(--bd);border-top-color:var(--primary);
+  animation:spin .8s linear infinite;
+}
+@keyframes spin{to{transform:rotate(1turn)}}
+
+/* ─── projector-only scale ───────────────────────────────────── */
+.screen-mode{font-size:clamp(17px,1.5vw,26px)}
+.screen-mode .q-text{font:800 clamp(26px,3.6vw,58px)/1.24 var(--fs);text-wrap:balance}
+.screen-mode .opt{font-size:clamp(19px,2vw,32px);padding:clamp(14px,1.6vw,26px)}
+.screen-mode .opt .lbl{width:clamp(38px,3.2vw,58px);height:clamp(38px,3.2vw,58px);font-size:clamp(17px,1.7vw,27px)}
+.screen-mode .timer{width:clamp(86px,7vw,132px);height:clamp(86px,7vw,132px);font-size:clamp(30px,2.8vw,48px)}
+
+/* ─── animation helpers ──────────────────────────────────────── */
+.fade-in{animation:fi .35s ease both}
+@keyframes fi{from{opacity:0;transform:translateY(9px)}}
+.pop-in{animation:pop .3s cubic-bezier(.2,1.3,.4,1) both}
+
+/* the lobby logo drifts gently so a waiting screen does not look frozen */
+.float-slow{
+  animation:floaty 6s ease-in-out infinite;
+  filter:drop-shadow(0 14px 44px var(--glow));
+  will-change:transform;
+}
+@keyframes floaty{
+  0%,100%{transform:translateY(0) scale(1)}
+  50%{transform:translateY(-14px) scale(1.015)}
+}
+@media (prefers-reduced-motion:reduce){
+  .float-slow{animation:none}
+}
+
+/* ─── print (host sheets, tambola tickets) ───────────────────── */
+@media print{
+  body::before{display:none}
+  body{background:#fff;color:#000}
+  .no-print{display:none !important}
+}
+
+/* ─── phone ──────────────────────────────────────────────────── */
+@media (max-width:640px){
+  .wrap{width:calc(100% - 24px)}
+  .card{padding:14px}
+  .opt{font-size:16px;padding:13px}
+  .g2,.g3{grid-template-columns:1fr}
+  .hdr .in{padding:8px 12px}
+  .logo{height:32px}
+}

@@ -1,0 +1,957 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Host Panel — Sarvodaya Ahinsa</title>
+
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+<link rel="stylesheet" href="assets/ui.css?v=1790175980">
+
+<style>
+.shell{display:grid;grid-template-columns:288px minmax(0,1fr) 288px;gap:14px;align-items:start;padding:14px 0}
+@media(max-width:1200px){.shell{grid-template-columns:262px minmax(0,1fr)} .rail-r{grid-column:1/-1}}
+@media(max-width:860px){.shell{grid-template-columns:1fr}.rail-l,.rail-r{position:static !important;max-height:none !important}}
+.rail-l,.rail-r{position:sticky;top:60px;max-height:calc(100vh - 74px);overflow:auto}
+
+.codebig{
+  font:800 clamp(28px,5vw,44px)/1 var(--fd);letter-spacing:.24em;color:var(--primary);
+  text-align:center;padding:12px 6px 8px;text-shadow:0 0 26px var(--glow);
+}
+.ipick{display:flex;flex-direction:column;gap:4px;max-height:330px;overflow:auto}
+.ipick button{
+  display:flex;gap:8px;align-items:center;padding:7px 10px;border-radius:7px;text-align:left;
+  background:var(--panel-2);border:1px solid var(--bd);color:var(--tx);cursor:pointer;
+  font:600 12.5px/1.35 var(--fs);transition:var(--t);
+}
+.ipick button:hover{border-color:var(--primary)}
+.ipick button.on{border-color:var(--primary);background:var(--glow)}
+.ipick button.used{opacity:.42}
+.ipick button .n{flex:none;width:21px;height:21px;display:grid;place-items:center;border-radius:5px;
+  background:var(--bg-deep);font:700 10px/1 var(--fd);color:var(--tx-mut)}
+.ipick button .s{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+#log{font:12px/1.6 ui-monospace,monospace;max-height:190px;overflow:auto;color:var(--tx-mut)}
+#log b{color:var(--primary)}
+.vpick{display:flex;flex-direction:column;gap:5px}
+.vrow{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:7px;
+  background:var(--panel-2);border:1px solid var(--bd);cursor:pointer;transition:var(--t);font-size:13px}
+.vrow.on{border-color:var(--primary);background:var(--glow)}
+</style>
+</head>
+<body>
+
+<div id="demo-slot"></div>
+<div id="hdr-slot-outer"></div>
+
+<div class="wrap">
+  <div id="stage"></div>
+</div>
+
+<div id="toast"></div>
+
+<script src="assets/brand.js?v=1790175980"></script>
+<script src="assets/i18n.js?v=1790175980"></script>
+<script src="assets/qr.js?v=1790175980"></script>
+<script src="assets/theme.js?v=1790175980"></script>
+<script src="assets/text.js?v=1790175980"></script>
+<script src="assets/fb.js?v=1790175980"></script>
+<script src="assets/engine.js?v=1790175980"></script>
+<script src="assets/types/quiz.js?v=1790175980"></script>
+<script src="assets/types/jumble.js?v=1790175980"></script>
+<script src="assets/types/buzzer.js?v=1790175980"></script>
+<script src="assets/types/tambola.js?v=1790175980"></script>
+<script src="assets/types/match.js?v=1790175980"></script>
+<script src="assets/types/custom.js?v=1790175980"></script>
+<script>
+/* ═══ होस्ट पैनल ═════════════════════════════════════════════════
+   The only place a show can be changed. The projector and every phone
+   read what is written here and never write back, which is what makes
+   it safe to hand the audience link to a thousand strangers.
+   ═══════════════════════════════════════════════════════════════ */
+
+const $ = SA.$;
+let SID = null, VID = null;        // session, venue
+let INFO = null, G = null;         // session info, game definition
+let LIVE = {}, PLAYERS = {}, TEAMS = {}, ANSWERS = {}, CLAIMS = {}, VENUES = {}, USED = {};
+let RID = null, IID = null;
+let grp = null, ansRef = null, tick = null;
+const scratch = {};
+
+$('demo-slot').innerHTML = SA.ui.demoBanner();
+$('hdr-slot-outer').innerHTML = SA.ui.header({ title: SA.t('host.title') });
+SA.ui.wireMode(() => { if (SID && G && VID) paint(); });
+
+SA.ui.requireAdmin().then(() => {
+  $('hdr-slot').innerHTML = `
+    <span class="pill" id="conn"><span class="dot"></span> ${SA.esc(SA.t('connecting'))}</span>
+    <a class="btn sm ghost" href="studio.html">🛠️ ${SA.esc(SA.t('home.studio'))}</a>
+    ${SA.ui.accountChip()}`;
+  SA.ui.wireAccount();
+  if (!SA.DEMO) SA.db.ref('.info/connected').on(v => {
+    const c = $('conn');
+    if (c) c.innerHTML = v ? '<span class="dot live"></span> ' + SA.t('live') : '<span class="dot off"></span> ' + SA.t('offline');
+  });
+  else $('conn').innerHTML = '<span class="dot live"></span> ' + SA.t('home.rehearse');
+
+  const s = SA.qs('s');
+  if (s) openSession(s); else chooser();
+});
+
+/* ═══════════ SESSION CHOOSER ═══════════ */
+async function chooser() {
+  const [idx, sessions] = await Promise.all([
+    SA.db.ref('sa/gameIndex').once(),
+    SA.db.ref('sa/sessions').once()
+  ]);
+  const games = Object.entries(idx || {}).map(([id, g]) => Object.assign({ id }, g))
+    .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+  /* finished shows stay in the list — otherwise there is no way to delete
+     them, and they quietly accumulate in the database for ever */
+  const live = Object.entries(sessions || {}).map(([id, s]) => Object.assign({ id }, s.info || {}))
+    .sort((a, b) => (a.status === 'ended' ? 1 : 0) - (b.status === 'ended' ? 1 : 0)
+                 || (b.createdAt || 0) - (a.createdAt || 0));
+
+  $('stage').innerHTML = `
+    <div class="col" style="gap:16px;padding:16px 0;max-width:840px;margin:0 auto">
+      ${live.length ? `
+        <div class="card col" style="gap:11px">
+          <label class="f" style="margin:0">${SA.t('host.running')}</label>
+          ${live.map(s => `
+            <div class="gitem vrow" data-open="${s.id}">
+              <span class="dot ${s.status === 'live' ? 'live' : ''}"></span>
+              <span class="grow" style="text-align:left"><b>${SA.esc(s.title)}</b>
+                <span class="sm mut" style="display:block">${SA.t('host.code_word')} ${SA.esc(s.code)} ·
+                  ${new Date(s.createdAt || 0).toLocaleString(SA.i18n.lang === 'hi' ? 'hi-IN' : 'en-IN')}${
+                  s.status === 'ended' ? ' · ' + SA.t('ended') : ''}</span></span>
+              <span class="pill ${s.status === 'ended' ? '' : 'p'}">${
+                s.status === 'ended' ? SA.t('ended') : SA.t('open')}</span>
+              <button class="btn sm ghost" data-kill="${s.id}" title="${SA.esc(SA.t('host.del_show'))}"
+                      style="padding:4px 7px">🗑</button>
+            </div>`).join('')}
+          <div class="sm mut">${SA.t('host.cleanup')}</div>
+        </div>` : ''}
+
+      <div class="card col" style="gap:11px">
+        <label class="f" style="margin:0">${SA.t('host.start_new')}</label>
+        ${games.length ? `<div class="grid g2">
+          ${games.map(g => `
+            <button class="gitem" data-new="${g.id}" style="--gc:${g.primary}">
+              <span style="font-size:22px">${SA.esc(g.icon || '🎯')}</span>
+              <span class="grow" style="text-align:left"><b>${SA.esc(g.title)}</b>
+                <span class="sm mut" style="display:block">${g.published ? SA.t('host.published') : SA.t('host.draft')}</span></span>
+            </button>`).join('')}
+        </div>` : `<div class="mut sm">${SA.t('host.no_games')}
+          <a href="studio.html">${SA.t('host.make_one')}</a></div>`}
+      </div>
+    </div>`;
+
+  $('stage').querySelectorAll('[data-open]').forEach(b => b.onclick = e => {
+    if (e.target.closest('[data-kill]')) return;
+    openSession(b.dataset.open);
+  });
+  $('stage').querySelectorAll('[data-kill]').forEach(b => b.onclick = async () => {
+    const s = live.find(x => x.id === b.dataset.kill);
+    if (!await SA.ui.confirm(SA.t('host.del_show_q'),
+      SA.t('host.del_show_b', { x: SA.esc(s.title) }), SA.t('st.del_forever'))) return;
+    await SA.sess.destroy(s.id);
+    SA.toast(SA.t('host.show_del'));
+    chooser();
+  });
+  $('stage').querySelectorAll('[data-new]').forEach(b => b.onclick = async () => {
+    b.disabled = true;
+    const gid = b.dataset.new;
+    const g = await SA.game.load(gid);
+    const { sid } = await SA.sess.create(gid, g, g.info.title);
+    openSession(sid);
+  });
+}
+
+/* auto-start a session when the Studio sent us here with ?g= */
+const wantGame = SA.qs('g');
+if (wantGame) {
+  SA.auth.onUser(async (u, admin) => {
+    if (!u || !admin || SID) return;
+    const g = await SA.game.load(wantGame);
+    if (!g) return;
+    const { sid } = await SA.sess.create(wantGame, g, g.info.title);
+    history.replaceState(null, '', '?s=' + sid);
+    openSession(sid);
+  });
+}
+
+/* ═══════════ OPEN A SESSION ═══════════ */
+async function openSession(sid) {
+  if (grp) grp.off();
+  if (ansRef) { ansRef.off(); ansRef = null; }
+  SID = sid;
+  history.replaceState(null, '', '?s=' + sid);
+
+  INFO = await SA.db.ref(SA.sess.P(sid) + '/info').once();
+  if (!INFO) { SA.toast(SA.t('host.not_found'), true); chooser(); return; }
+  G = await SA.game.load(INFO.gameId);
+  if (!G) { SA.toast(SA.t('host.game_gone'), true); chooser(); return; }
+
+  SA.theme.apply(G.theme, SA.theme.savedMode());
+
+  /* The projector and the phones cannot read sa/games, so the session
+     carries its own copy of the look and of the join questions. Refresh
+     that copy every time the host opens the show — otherwise a theme
+     changed in the Studio after the session was created never reaches
+     the projector, and the two end up different colours. */
+  SA.db.ref(SA.sess.P(sid) + '/info').update({
+    theme: G.theme || { preset: SA.theme.DEFAULT },
+    icon: G.info.icon || '🎯',
+    ask: {
+      city:  (G.config && G.config.askCity)  || 'opt',
+      phone: (G.config && G.config.askPhone) || 'opt',
+      age:   (G.config && G.config.askAge)   || 'opt'
+    }
+  }).catch(() => {});
+
+  const rounds = SA.game.roundsOf(G);
+  RID = rounds.length ? rounds[0].id : null;
+
+  grp = SA.db.group();
+  grp.on(SA.sess.P(sid) + '/venues', v => {
+    VENUES = v || {};
+    /* the dashboard links straight to one venue's controls */
+    const want = SA.qs('v');
+    if (want && VENUES[want] && !VID) VID = want;
+    if (!VID || !VENUES[VID]) VID = Object.keys(VENUES)[0] || null;
+    if (VID) bindVenue();
+    paint();
+  });
+  grp.on(SA.sess.P(sid) + '/players', p => { PLAYERS = p || {}; paint(); pushBoard(); });
+  grp.on(SA.sess.P(sid) + '/info',    i => { INFO = i || INFO; paint(); });
+}
+
+let vgrp = null;
+function bindVenue() {
+  if (vgrp) vgrp.off();
+  vgrp = SA.db.group();
+  vgrp.on(SA.sess.P(SID) + '/live/' + VID,   l => { LIVE = l || {}; bindAnswers(); paint(); });
+  vgrp.on(SA.sess.P(SID) + '/teams/' + VID,  t => { TEAMS = t || {}; paint(); });
+  vgrp.on(SA.sess.P(SID) + '/claims/' + VID, c => { CLAIMS = c || {}; paint(); });
+  vgrp.on(SA.sess.P(SID) + '/used/' + VID,   u => { USED = u || {}; paint(); });
+  SA.sess.presence(SID, VID, 'host');
+  pushBoard();          // the new venue's screen needs its own board
+}
+
+/* Answers live under the round+item, so the listener has to move each
+   time the host loads a new question — otherwise old answers bleed in. */
+let boundKey = '';
+function bindAnswers() {
+  const key = (LIVE.roundId || '') + '/' + (LIVE.itemId || '');
+  if (key === boundKey) return;
+  boundKey = key;
+  if (ansRef) { ansRef.off(); ansRef = null; }
+  ANSWERS = {};
+  if (!LIVE.roundId || !LIVE.itemId) return;
+  ansRef = SA.sess.watchAnswers(SID, LIVE.roundId, LIVE.itemId, a => { ANSWERS = a || {}; paint(); });
+}
+
+/* ═══════════ ACTIONS ═══════════ */
+/* Firebase rejects undefined; turn it into null so a half-filled patch
+   cannot take down a live show. */
+function clean(o) {
+  const out = {};
+  Object.keys(o).forEach(k => { out[k] = o[k] === undefined ? null : o[k]; });
+  return out;
+}
+
+/* Round *config* is safe to publish — it holds timers, block choices and
+   claim values, never answers. Phones and projectors are not admins and
+   cannot read sa/games, so this is how they learn how to draw a round. */
+const roundMeta = r => r ? { id: r.id, type: r.type, title: r.title, config: r.config || {} } : null;
+
+function act(patch) {
+  const round = curRound(), item = curItem();
+  const merged = Object.assign({}, LIVE, patch);
+  const t = round && SA.types.get(round.type);
+  if (t && t.payload && item && !t.continuous) {
+    patch.payload = t.payload(item, merged, round) || null;
+  }
+  if (round && (!LIVE.roundMeta || LIVE.roundMeta.id !== round.id)) patch.roundMeta = roundMeta(round);
+  /* A round's own "Show" button is the other way an item reaches the
+     projector, so carry the staged selection along with it. */
+  if (round && LIVE.roundId !== round.id) patch.roundId = round.id;
+  if (item && LIVE.itemId !== item.id) {
+    patch.itemId = item.id;
+    SA.sess.markUsed(SID, VID, round.id, item.id);
+  }
+  LIVE = Object.assign(merged, patch);   // optimistic, so the panel feels instant
+  SA.sess.setLive(SID, VID, clean(patch));
+}
+
+const curRound = () => RID && G.rounds && G.rounds[RID] ? Object.assign({ id: RID }, G.rounds[RID]) : null;
+const curItems = () => RID ? SA.game.itemsOf(G, RID) : [];
+const curItem  = () => {
+  const id = IID || LIVE.itemId;
+  if (!id || !G.content || !G.content[RID]) return null;
+  const it = G.content[RID][id];
+  return it ? Object.assign({ id }, it) : null;
+};
+
+/* Picking an item only STAGES it: the host reads it privately first and
+   the room sees nothing. It reaches the projector when they press
+   "Show it on the projector" (or step 1 in the round's own controls).
+   Before this, clicking a question in the list put it straight on the
+   big screen, which gave the answer away before it was read out. */
+function loadItem(id) {
+  IID = id;
+  paint();
+}
+
+function pushItem() {
+  const round = curRound(), item = curItem();
+  if (!round || !item) return;
+  const t = SA.types.get(round.type);
+  SA.sess.markUsed(SID, VID, RID, item.id);
+  act({
+    roundId: RID, itemId: item.id, phase: 'shown', screen: 'round',
+    roundMeta: roundMeta(round),
+    open: false, reveal: false, startAt: 0, endAt: 0,
+    fifty: null, teamAns: null, showTally: false, showHint: false, top: null,
+    /* last question's winners must not linger over the new one */
+    qtop: null, qtopAt: 0,
+    payload: t && t.payload ? (t.payload(item, { reveal: false }, round) || null) : null
+  });
+  log(SA.t('host.loaded') + ': ' + String(SA.types.call(round.type, 'itemSummary', item) || '').slice(0, 50));
+}
+
+function randomUnused() {
+  const items = curItems().filter(i => !(USED[RID] && USED[RID][i.id]));
+  if (!items.length) { SA.toast(SA.t('host.pool_empty'), true); return; }
+  loadItem(items[Math.floor(Math.random() * items.length)].id);
+}
+function stepItem(d) {
+  const items = curItems();
+  const i = items.findIndex(x => x.id === (IID || LIVE.itemId));
+  const j = Math.max(0, Math.min(items.length - 1, (i < 0 ? -1 : i) + d));
+  if (items[j]) loadItem(items[j].id);
+}
+
+/* Phones and projectors cannot read the player list — see publishBoard in
+   engine.js for why — so the host republishes the board for them whenever
+   anything changes. Settling a question moves dozens of scores at once,
+   hence the wait: one write instead of sixty. */
+let boardWait = null;
+function pushBoard() {
+  if (!SID || !VID) return;
+  clearTimeout(boardWait);
+  boardWait = setTimeout(() => {
+    SA.sess.publishBoard(SID, VID, PLAYERS, !!(INFO && INFO.combinedBoard))
+      .catch(e => console.warn('[SA] board publish failed', e));
+  }, 600);
+}
+
+async function settle() {
+  const round = curRound(), item = curItem();
+  if (!round || !item) return;
+  const rows = await SA.sess.settle(SID, round, item, {
+    config: Object.assign({}, G.config, round.config),
+    startAt: LIVE.startAt || 0
+  });
+  const got = rows.filter(r => r.pts).length;
+
+  /* The answers node is admin-only — phones and projectors cannot read
+     who else answered. So the host publishes the ten best for THIS
+     question into live state, which is the one thing they can read.
+     Kept to name, city, points and time: no answers, no uids.        */
+  const qtop = rows
+    .filter(r => r.pts > 0 || r.ok === true)
+    .filter(r => !r.venueId || r.venueId === VID)
+    .sort((a, b) => (b.pts || 0) - (a.pts || 0) || (a.ms || 0) - (b.ms || 0) || a.at - b.at)
+    .slice(0, 10)
+    .map(r => ({ n: r.name, c: r.city || '', p: r.pts || 0, ms: r.ms || 0 }));
+  act({ qtop: qtop.length ? qtop : null, qtopAt: Date.now() });
+
+  SA.toast(SA.t('host.scored', { x: got }));
+  log(SA.t('host.gave_points') + ' — ' + got);
+}
+
+/* ═══════════ AUDIENCE ═══════════
+   Everyone who joined, with everything they gave us. This is the only
+   place the mobile numbers and ages are ever shown — phones and
+   projectors are refused that node by the rules — and it is the record
+   the host takes away afterwards. */
+function audienceRows() {
+  return Object.entries(PLAYERS || {})
+    .map(([uid, p]) => Object.assign({ uid }, p))
+    .sort((a, b) => (b.score || 0) - (a.score || 0) || (a.joinedAt || 0) - (b.joinedAt || 0));
+}
+
+function downloadAudience() {
+  const rows = audienceRows();
+  if (!rows.length) { SA.toast(SA.t('aud.none'), true); return false; }
+  const head = ['rank', 'name', 'city', 'mobile', 'age', 'venue', 'score', 'joined'];
+  const cell = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+  const csv = head.join(',') + '\n' + rows.map((r, i) => [
+    i + 1, r.name, r.city || '', r.phone || '', r.age || '',
+    (VENUES[r.venueId] || {}).name || '', r.score || 0,
+    r.joinedAt ? new Date(r.joinedAt).toLocaleString('en-IN') : ''
+  ].map(cell).join(',')).join('\n');
+
+  const stamp = new Date().toISOString().slice(0, 10);
+  const a = document.createElement('a');
+  /* the BOM keeps Excel from mangling Devanagari names */
+  a.href = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' }));
+  a.download = ((INFO.title || 'audience') + ' ' + stamp).replace(/[\\/:*?"<>|]/g, '') + '.csv';
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  SA.toast(SA.t('aud.saved', { x: rows.length }));
+  return true;
+}
+
+function overlay(inner) {
+  const el = document.createElement('div');
+  el.className = 'ovl';
+  el.innerHTML = `<div class="box card col" style="gap:13px;max-width:900px;width:min(900px,94vw)">${inner}</div>`;
+  document.body.appendChild(el);
+  el.addEventListener('click', e => { if (e.target === el) el.remove(); });
+  return el;
+}
+
+function audiencePanel() {
+  const rows = audienceRows();
+  const multi = Object.keys(VENUES).length > 1;
+  const el = overlay(`
+    <div class="spread">
+      <h3 style="font-size:18px">👥 ${SA.esc(SA.t('aud.title'))}
+        <span class="mut sm">· ${rows.length}</span></h3>
+      <button class="btn sm ghost" data-x>✕</button>
+    </div>
+    <div class="row wrap-r" style="gap:8px">
+      <input type="search" id="aud-find" class="grow" placeholder="${SA.esc(SA.t('aud.find'))}"
+             style="min-width:180px">
+      <button class="btn sm p" data-csv>⬇ ${SA.esc(SA.t('aud.csv'))}</button>
+    </div>
+    <div style="overflow:auto;max-height:60vh;border:1px solid var(--bd);border-radius:var(--r-sm)">
+      <table class="tbl" id="aud-tbl">
+        <thead><tr>
+          <th>#</th><th>${SA.esc(SA.t('aud.h_name'))}</th><th>${SA.esc(SA.t('aud.h_city'))}</th>
+          <th>${SA.esc(SA.t('aud.h_phone'))}</th><th>${SA.esc(SA.t('aud.h_age'))}</th>
+          ${multi ? `<th>${SA.esc(SA.t('aud.h_venue'))}</th>` : ''}
+          <th>${SA.esc(SA.t('aud.h_score'))}</th><th>${SA.esc(SA.t('aud.joined'))}</th>
+        </tr></thead>
+        <tbody>
+          ${rows.length ? rows.map((r, i) => `
+            <tr data-hay="${SA.esc(((r.name || '') + ' ' + (r.city || '') + ' ' + (r.phone || '')).toLowerCase())}">
+              <td class="mut">${i + 1}</td>
+              <td><b>${SA.esc(r.name || '—')}</b></td>
+              <td>${SA.esc(r.city || '—')}</td>
+              <td>${SA.esc(r.phone || '—')}</td>
+              <td>${SA.esc(r.age || '—')}</td>
+              ${multi ? `<td>${SA.esc((VENUES[r.venueId] || {}).name || '—')}</td>` : ''}
+              <td style="color:var(--primary);font-weight:800">${r.score || 0}</td>
+              <td class="mut sm">${r.joinedAt
+                ? new Date(r.joinedAt).toLocaleTimeString(SA.i18n.lang === 'hi' ? 'hi-IN' : 'en-IN',
+                    { hour: '2-digit', minute: '2-digit' }) : '—'}</td>
+            </tr>`).join('')
+          : `<tr><td colspan="8" class="mut tc" style="padding:26px">${SA.esc(SA.t('aud.none'))}</td></tr>`}
+        </tbody>
+      </table>
+    </div>
+    <div class="sm mut">${SA.esc(SA.t('aud.note'))}</div>`);
+
+  el.querySelector('[data-x]').onclick = () => el.remove();
+  el.querySelector('[data-csv]').onclick = downloadAudience;
+  const find = el.querySelector('#aud-find');
+  find.oninput = () => {
+    const q = find.value.trim().toLowerCase();
+    el.querySelectorAll('tbody tr[data-hay]').forEach(tr => {
+      tr.style.display = !q || tr.dataset.hay.includes(q) ? '' : 'none';
+    });
+  };
+  find.focus();
+}
+
+/* Reset clears the people and the answers but keeps the show itself —
+   same code, same rounds, ready to run again for the next hall. The
+   list is gone for good once it goes, so the button stays locked until
+   the host has taken a copy of it. */
+function resetPanel() {
+  const n = Object.keys(PLAYERS || {}).length;
+  const el = overlay(`
+    <h3 style="font-size:18px">↺ ${SA.esc(SA.t('aud.reset_q'))}</h3>
+    <div class="sub col" style="gap:8px">
+      <div class="sm">${SA.esc(SA.t('aud.reset_b'))}</div>
+      <ul class="sm mut" style="padding-left:18px;line-height:1.7">
+        <li>${SA.esc(SA.t('aud.reset_1', { x: n }))}</li>
+        <li>${SA.esc(SA.t('aud.reset_2'))}</li>
+        <li>${SA.esc(SA.t('aud.reset_3'))}</li>
+        <li>${SA.esc(SA.t('aud.reset_4'))}</li>
+      </ul>
+    </div>
+    <div class="sub col" style="gap:9px;border-color:var(--primary)">
+      <b class="sm">⬇ ${SA.esc(SA.t('aud.reset_save'))}</b>
+      <button class="btn p wide" data-csv>⬇ ${SA.esc(SA.t('aud.csv'))}</button>
+      <label class="chk sm"><input type="checkbox" data-have> ${SA.esc(SA.t('aud.reset_have'))}</label>
+    </div>
+    <div class="row" style="justify-content:flex-end;gap:8px">
+      <button class="btn ghost" data-no>${SA.esc(SA.t('cancel'))}</button>
+      <button class="btn bad" data-go disabled>↺ ${SA.esc(SA.t('aud.reset_go'))}</button>
+    </div>`);
+
+  const go = el.querySelector('[data-go]');
+  const have = el.querySelector('[data-have]');
+  const unlock = () => { go.disabled = !(have.checked || n === 0); };
+  have.onchange = unlock;
+  unlock();
+
+  el.querySelector('[data-csv]').onclick = () => {
+    if (downloadAudience()) { have.checked = true; unlock(); }
+  };
+  el.querySelector('[data-no]').onclick = () => el.remove();
+
+  go.onclick = async () => {
+    go.disabled = true; go.textContent = SA.t('aud.resetting');
+    const P = SA.sess.P(SID);
+    try {
+      await Promise.all([
+        SA.db.ref(P + '/players').remove(),
+        SA.db.ref(P + '/answers').remove(),
+        SA.db.ref(P + '/claims').remove(),
+        SA.db.ref(P + '/used').remove()
+      ]);
+      /* team scores back to zero, and every venue's screen back to the
+         logo — a fresh hall should not open on the last hall's board */
+      const venues = Object.keys(VENUES);
+      await Promise.all(venues.map(async vid => {
+        const teams = (await SA.db.ref(P + '/teams/' + vid).once()) || {};
+        await Promise.all(Object.keys(teams).map(tid =>
+          SA.db.ref(P + '/teams/' + vid + '/' + tid + '/score').set(0)));
+        await SA.db.ref(P + '/live/' + vid).set(SA.sess.blankLive());
+      }));
+      /* A fresh code, because the old one is on every phone that played
+         the last show and in whatever WhatsApp group it was pasted into.
+         Leaving it would let last night's audience walk back into
+         tonight's hall. The old code is released at the same time. */
+      const oldCode = INFO.code || '';
+      const code = await SA.sess.freeCode();
+      await SA.db.ref('sa/codes/' + code).set({ sid: SID, at: Date.now() });
+      if (oldCode && oldCode !== code) await SA.db.ref('sa/codes/' + oldCode).remove();
+
+      /* setStatus, not a bare write — it also takes the show off the
+         hub's "live now" list, which a reset back to the lobby must do */
+      await SA.db.ref(P + '/info').update({ code });
+      await SA.sess.setStatus(SID, 'lobby', G);
+      INFO.status = 'lobby';
+      INFO.code = code;
+      PLAYERS = {};
+      /* Back to the first round rather than to nothing. Leaving RID null
+         made the panel say "This game has no rounds", which read as
+         though the reset had eaten the questions. */
+      const rs = SA.game.roundsOf(G);
+      RID = rs.length ? rs[0].id : null;
+      IID = null;
+      el.remove();
+      SA.toast(SA.t('aud.reset_ok_code', { x: code }));
+      log(SA.t('aud.reset_ok_code', { x: code }));
+      paint();
+    } catch (e) {
+      go.disabled = false; go.textContent = '↺ ' + SA.t('aud.reset_go');
+      SA.toast(e.message || 'Reset failed', true);
+    }
+  };
+}
+
+function log(msg) {
+  const l = $('log'); if (!l) return;
+  l.insertAdjacentHTML('afterbegin',
+    `<div><b>${new Date().toLocaleTimeString(SA.i18n.lang === 'hi' ? 'hi-IN' : 'en-IN', { hour12: false })}</b> ${SA.esc(msg)}</div>`);
+  while (l.children.length > 50) l.lastChild.remove();
+}
+
+/* ═══════════ PAINT ═══════════ */
+function paint() {
+  if (!SID || !G || !VID) return;
+  const round = curRound();
+  const items = curItems();
+  const rounds = SA.game.roundsOf(G);
+  const item = curItem();
+  const t = round && SA.types.get(round.type);
+  const joined = Object.keys(PLAYERS).filter(u => PLAYERS[u].venueId === VID).length;
+  const usedN = Object.keys((USED && USED[RID]) || {}).length;
+  const link = location.origin + location.pathname.replace(/host\.html$/, '') + 'play.html?s=' + SID;
+
+  $('stage').innerHTML = `
+    <div class="shell">
+
+      <!-- ══ LEFT ══ -->
+      <aside class="rail-l col" style="gap:12px">
+        <div class="card tight col" style="gap:8px">
+          <div class="xs mut tc">${SA.t('host.join_code')}</div>
+          <div class="codebig">${SA.esc(INFO.code || '—')}</div>
+          <button class="btn ${LIVE.screen === 'qr' ? 'on' : 'p'} wide sm" id="qr-screen">
+            📺 ${SA.esc(LIVE.screen === 'qr' ? SA.t('host.qr_screen_off') : SA.t('host.qr_screen'))}</button>
+          <div class="row" style="gap:6px">
+            <button class="btn sm grow" id="copy-link">🔗 ${SA.t('host.link')}</button>
+            <button class="btn sm grow" id="show-qr" title="${SA.esc(SA.t('host.qr_print_h'))}">
+              🖨 ${SA.esc(SA.t('host.qr_print'))}</button>
+          </div>
+          <div class="spread" style="margin-top:4px">
+            <span class="sm mut">📱 ${joined} ${SA.t('joined')}</span>
+            <span class="pill ${INFO.status === 'live' ? 'ok' : ''}">${
+              INFO.status === 'live' ? SA.t('live') : INFO.status === 'lobby' ? SA.t('lobby') : SA.esc(INFO.status)}</span>
+          </div>
+          <button class="btn ${INFO.status === 'live' ? 'ghost' : 'p'} wide sm" id="go-live">
+            ${INFO.status === 'live' ? '⏸ ' + SA.t('host.end_live') : '▶ ' + SA.t('host.go_live')}</button>
+          <button class="btn ghost wide sm" id="end-show" style="color:var(--bad)">
+            🏁 ${SA.esc(SA.t('host.end_show'))}</button>
+          <!-- Everyone who played, with their details, available during the
+               show and — the point of it — after it has finished. -->
+          <button class="btn ${INFO.status === 'ended' ? 'p' : 'ghost'} wide sm" id="open-aud">
+            👥 ${SA.esc(SA.t('aud.open', { x: Object.keys(PLAYERS).length }))}</button>
+          <button class="btn ghost wide sm" id="reset-show">
+            ↺ ${SA.esc(SA.t('aud.reset'))}</button>
+        </div>
+
+        <div class="card tight col" style="gap:8px">
+          <div class="spread"><span class="xs mut">${SA.t('host.venues')}</span>
+            <button class="btn sm ghost" id="add-venue">+</button></div>
+          <div class="vpick">
+            ${Object.entries(VENUES).map(([id, v]) => `
+              <div class="vrow ${id === VID ? 'on' : ''}" data-v="${id}">
+                <span class="grow"><b>${SA.esc(v.name)}</b>
+                  ${v.city ? `<span class="sm mut" style="display:block">${SA.esc(v.city)}</span>` : ''}</span>
+                <span class="sm mut">${Object.values(PLAYERS).filter(p => p.venueId === id).length}</span>
+              </div>`).join('')}
+          </div>
+          ${Object.keys(VENUES).length > 1 ? `
+            <button class="btn sm wide" id="sync-all">⇉ ${SA.t('host.sync_here')}</button>` : ''}
+          <a class="btn sm ghost wide" href="dashboard.html?s=${SID}">📊 ${SA.t('host.all_venues')}</a>
+        </div>
+
+        <div class="card tight col" style="gap:8px">
+          <div class="xs mut">${SA.t('host.round')}</div>
+          ${rounds.length ? '' : `<div class="mut sm">${SA.esc(SA.t('st.no_rounds'))}</div>`}
+          ${rounds.map(r => {
+            const m = SA.types.get(r.type);
+            return `<button class="vrow ${r.id === RID ? 'on' : ''}" data-rr="${r.id}" style="width:100%">
+              <span>${m ? m.icon : '•'}</span>
+              <span class="grow" style="text-align:left"><b>${SA.esc(r.title)}</b>
+                <span class="sm mut" style="display:block">${SA.game.itemsOf(G, r.id).length} ${SA.t('items')}</span></span>
+            </button>`;
+          }).join('')}
+        </div>
+      </aside>
+
+      <!-- ══ CENTRE ══ -->
+      <main class="col" style="gap:12px;min-width:0">
+        ${!round ? `<div class="card tc mut" style="padding:40px">
+            ${rounds.length
+              /* There is a world of difference between "this game is
+                 empty" and "you have not picked a round yet", and saying
+                 the first when the second is true reads as though the
+                 questions have been lost. */
+              ? SA.esc(SA.t('host.pick_round'))
+              : SA.t('host.no_rounds') + ' <a href="studio.html?g=' + INFO.gameId + '">' +
+                SA.esc(SA.t('host.add_studio')) + '</a>'}</div>`
+        : t && t.continuous ? '' : `
+          <div class="card row wrap-r" style="gap:7px">
+            <button class="btn p" id="ld-rand">🎲 ${SA.t('host.load_random')} <span class="kbd">L</span></button>
+            <button class="btn sm" id="ld-prev">◀</button>
+            <button class="btn sm" id="ld-next">▶</button>
+            <span class="grow"></span>
+            <span class="sm mut">${SA.t('host.done_count', { a: usedN, b: items.length })}</span>
+            <button class="btn sm ghost" id="reset-used" ${usedN ? '' : 'disabled'}>↺ ${SA.t('host.reset_pool')}</button>
+          </div>`}
+
+        ${item && !(t && t.continuous) ? (LIVE.itemId === item.id
+          ? `<div class="card row" style="gap:10px;border-color:var(--ok);align-items:center">
+               <span class="pill ok"><span class="dot live"></span>${SA.esc(SA.t('host.on_screen'))}</span>
+               ${LIVE.open ? '' : `<span class="sm mut grow">${SA.esc(SA.t('host.answers_shut'))}</span>`}
+             </div>`
+          : `<div class="card row wrap-r" style="gap:12px;border-color:var(--primary);align-items:center">
+               <span class="sm mut grow">👁 ${SA.esc(SA.t('host.staged'))}</span>
+               <button class="btn p big" id="push-item">📺 ${SA.esc(SA.t('host.show_now'))}</button>
+             </div>`) : ''}
+
+        <!-- Projector keys sit ABOVE the round panel on purpose. The answer
+             list below grows with every phone that replies, and when this
+             row was underneath it the controls slid off the bottom of the
+             screen exactly when the host needed them. -->
+        <div class="card row wrap-r" style="gap:7px;position:sticky;top:56px;z-index:20">
+          <span class="xs mut" style="align-self:center">${SA.t('host.screen')}</span>
+          <button class="btn sm ${LIVE.screen === 'round' ? 'on' : ''}" data-sc="round">${SA.t('host.sc_game')}</button>
+          <button class="btn sm ${LIVE.screen === 'leaderboard' ? 'on' : ''}" data-sc="leaderboard">🏆 ${SA.t('host.sc_top')}</button>
+          <button class="btn sm ${LIVE.screen === 'qtop' ? 'on' : ''}" data-sc="qtop"
+            ${LIVE.qtop ? '' : 'disabled'} title="${SA.esc(SA.t('host.q_top_sent'))}">⚡ ${SA.t('host.sc_qtop')}</button>
+          <button class="btn sm ${LIVE.screen === 'teams' ? 'on' : ''}" data-sc="teams">👥 ${SA.t('host.sc_teams')}</button>
+          <button class="btn sm ${LIVE.screen === 'logo' ? 'on' : ''}" data-sc="logo">🪷 ${SA.t('host.sc_logo')}</button>
+          <button class="btn sm ${LIVE.screen === 'qr' ? 'on' : ''}" data-sc="qr">▦ ${SA.t('host.sc_qr')}</button>
+          <button class="btn sm ${LIVE.qrCorner !== false ? 'on' : ''}" id="qr-corner-tog"
+                  title="${SA.esc(SA.t('sc.qr_corner'))}">▫ ${SA.t('host.qr_toggle')}</button>
+          <button class="btn sm ${LIVE.screen === 'blank' ? 'on' : ''}" data-sc="blank">⬛ ${SA.t('host.sc_blank')} <span class="kbd">0</span></button>
+          <button class="btn sm" id="proj-mode" title="${SA.esc(SA.t('host.proj_mode_h'))}">
+            ${LIVE.screenMode === 'light' ? '☀ ' + SA.t('host.proj_light') : '🌙 ' + SA.t('host.proj_dark')}</button>
+          <span class="grow"></span>
+          <a class="btn sm ghost" href="screen.html?s=${SID}&v=${VID}" target="_blank">↗ ${SA.t('host.open_screen')}</a>
+        </div>
+
+        <div id="type-panel">
+          ${round && !item && !(t && t.continuous)
+            ? `<div class="card tc mut" style="padding:40px">
+                 ${SA.t('host.pick_item')}</div>` : ''}
+        </div>
+      </main>
+
+      <!-- ══ RIGHT ══ -->
+      <aside class="rail-r col" style="gap:12px">
+        ${round && !(t && t.continuous) ? `
+          <div class="card tight col" style="gap:8px">
+            <div class="xs mut">${SA.esc(round.title)} — ${SA.t('items')}</div>
+            <div class="ipick">
+              ${items.map((it, i) => `
+                <button data-it="${it.id}"
+                  class="${it.id === (IID || LIVE.itemId) ? 'on' : ''} ${USED[RID] && USED[RID][it.id] ? 'used' : ''}">
+                  <span class="n">${i + 1}</span>
+                  <span class="s">${SA.esc(String(SA.types.call(round.type, 'itemSummary', it) || '—'))}</span>
+                </button>`).join('') || `<div class="mut sm">${SA.t('host.no_items')}</div>`}
+            </div>
+          </div>` : ''}
+
+        <div class="card tight col" style="gap:8px">
+          <div class="spread"><span class="xs mut">${SA.t('host.top_players')}</span>
+            <button class="btn sm ghost" id="dl-csv">⬇</button></div>
+          <div class="tabs">
+            <button class="${scratch.hostBoard === 'q' ? '' : 'on'}" data-hb="all">${SA.esc(SA.t('play.board_all'))}</button>
+            <button class="${scratch.hostBoard === 'q' ? 'on' : ''}" data-hb="q">${SA.esc(SA.t('play.board_q'))}</button>
+          </div>
+          <!-- Ten names, and the list scrolls rather than clipping: a long
+               name used to widen the row until the tenth fell off. -->
+          <div style="max-height:${scratch.hostAll ? '62vh' : '340px'};overflow:auto">
+            ${scratch.hostBoard === 'q'
+              ? SA.render.qtop(LIVE.qtop || [])
+              : SA.render.leaderboard(SA.sess.board(PLAYERS, VID, scratch.hostAll ? 200 : 10))}
+          </div>
+          ${scratch.hostBoard !== 'q' && Object.keys(PLAYERS).length > 10 ? `
+            <button class="btn sm ghost wide" id="hb-more">${SA.esc(scratch.hostAll
+              ? SA.t('host.show_less')
+              : SA.t('host.show_all', { x: SA.sess.board(PLAYERS, VID, 9999).length }))}</button>` : ''}
+        </div>
+
+        ${Object.keys(TEAMS).length ? `
+          <div class="card tight col" style="gap:8px">
+            <div class="xs mut">${SA.t('host.stage_teams')}</div>
+            ${SA.render.teamBoard(TEAMS, { buttons: true })}
+          </div>` : ''}
+
+        <div class="card tight col" style="gap:6px">
+          <div class="xs mut">${SA.t('host.activity')}</div>
+          <div id="log"></div>
+        </div>
+      </aside>
+    </div>`;
+
+  /* ---- type panel ---- */
+  if (round && (item || (t && t.continuous))) {
+    SA.types.call(round.type, 'hostPanel', $('type-panel'), {
+      sid: SID, vid: VID, info: INFO, round, item: item || {}, items,
+      live: LIVE, answers: ANSWERS, players: PLAYERS, teams: TEAMS, claims: CLAIMS,
+      cfg: Object.assign({}, G.config, round.config),
+      act, settle, scratch
+    });
+  }
+
+  wire();
+  startTick();
+}
+
+/* ═══════════ WIRING ═══════════ */
+function wire() {
+  const q = s => $('stage').querySelector(s);
+  const all = s => $('stage').querySelectorAll(s);
+
+  all('[data-v]').forEach(el => el.onclick = () => { VID = el.dataset.v; boundKey = ''; bindVenue(); paint(); });
+  all('[data-rr]').forEach(el => el.onclick = () => {
+    RID = el.dataset.rr; IID = null;
+    const r = curRound(), t = r && SA.types.get(r.type);
+    /* a continuous round (tambola) never calls loadItem, so publish its
+       metadata here or phones have nothing to draw claim buttons from */
+    if (t && t.continuous) act({ roundId: RID, itemId: '', roundMeta: roundMeta(r), screen: 'round' });
+    paint();
+  });
+  all('[data-it]').forEach(el => el.onclick = () => loadItem(el.dataset.it));
+  all('[data-sc]').forEach(el => el.onclick = () => act({ screen: el.dataset.sc }));
+  const qt = q('#qr-corner-tog');
+  if (qt) qt.onclick = () => act({ qrCorner: LIVE.qrCorner === false });
+
+  const pi = q('#push-item'); if (pi) pi.onclick = pushItem;
+  const r = q('#ld-rand');   if (r) r.onclick = randomUnused;
+  const p = q('#ld-prev');   if (p) p.onclick = () => stepItem(-1);
+  const n = q('#ld-next');   if (n) n.onclick = () => stepItem(1);
+  const ru = q('#reset-used');
+  if (ru) ru.onclick = async () => {
+    if (!await SA.ui.confirm(SA.t('host.reset_q'), SA.t('host.reset_body'), SA.t('host.reset_yes'))) return;
+    SA.sess.clearUsed(SID, VID, RID); log(SA.t('host.pool_reset'));
+  };
+
+  q('#qr-screen').onclick = () =>
+    act({ screen: LIVE.screen === 'qr' ? 'logo' : 'qr' });
+
+  q('#proj-mode').onclick = () =>
+    act({ screenMode: LIVE.screenMode === 'light' ? 'dark' : 'light' });
+
+  q('#copy-link').onclick = () => {
+    const link = location.origin + location.pathname.replace(/host\.html$/, '') + 'play.html?s=' + SID;
+    navigator.clipboard.writeText(link).then(() => SA.toast(SA.t('host.copied')))
+      .catch(() => prompt(SA.t('host.share_link'), link));
+  };
+  q('#show-qr').onclick = showQR;
+
+  q('#go-live').onclick = async () => {
+    const next = INFO.status === 'live' ? 'lobby' : 'live';
+    await SA.sess.setStatus(SID, next, G);
+    INFO.status = next;
+    SA.toast(next === 'live' ? SA.t('host.is_live') : SA.t('host.to_lobby'));
+    paint();
+  };
+
+  q('#end-show').onclick = async () => {
+    if (!await SA.ui.confirm(SA.t('host.end_q'), SA.t('host.end_b'), SA.t('host.end_show'))) return;
+    await SA.sess.end(SID);
+    INFO.status = 'ended';
+    SA.toast(SA.t('host.ended_ok'));
+    log(SA.t('host.ended_ok'));
+    paint();
+  };
+
+  q('#add-venue').onclick = async () => {
+    const el = document.createElement('div');
+    el.className = 'ovl';
+    el.innerHTML = `<div class="box card col" style="gap:12px">
+        <h3 style="font-size:18px">${SA.t('host.new_venue')}</h3>
+        <div><label class="f">${SA.t('host.venue_name')}</label><input type="text" id="vn" placeholder="${SA.esc(SA.t('host.venue_ph'))}" autofocus></div>
+        <div><label class="f">${SA.t('host.venue_city')}</label><input type="text" id="vc" placeholder="${SA.esc(SA.t('host.city_ph'))}"></div>
+        <div class="sm mut">${SA.t('host.venue_note')}</div>
+        <div class="row" style="justify-content:flex-end;gap:8px">
+          <button class="btn ghost" data-no>${SA.t('cancel')}</button><button class="btn p" data-yes>${SA.t('add')}</button></div>
+      </div>`;
+    document.body.appendChild(el);
+    el.querySelector('[data-no]').onclick = () => el.remove();
+    el.onclick = e => { if (e.target === el) el.remove(); };
+    el.querySelector('[data-yes]').onclick = async () => {
+      const name = el.querySelector('#vn').value.trim() || SA.t('def.new_venue');
+      const city = el.querySelector('#vc').value.trim();
+      el.remove();
+      await SA.sess.addVenue(SID, G, name, city);
+      SA.toast(SA.t('host.venue_added'));
+    };
+  };
+
+  const sy = q('#sync-all');
+  if (sy) sy.onclick = async () => {
+    if (!await SA.ui.confirm(SA.t('host.sync_q'), SA.t('host.sync_body'), SA.t('host.sync_yes'))) return;
+    const n = await SA.sess.syncAll(SID, VID);
+    SA.toast(SA.t('host.synced', { x: n })); log(SA.t('host.synced_log'));
+  };
+
+  all('[data-hb]').forEach(b => b.onclick = () => {
+    scratch.hostBoard = b.dataset.hb; scratch.hostAll = false; paint();
+  });
+  const hbMore = q('#hb-more');
+  if (hbMore) hbMore.onclick = () => { scratch.hostAll = !scratch.hostAll; paint(); };
+
+  q('#dl-csv').onclick = downloadAudience;
+  const aud = q('#open-aud');
+  if (aud) aud.onclick = audiencePanel;
+  const rst = q('#reset-show');
+  if (rst) rst.onclick = resetPanel;
+
+  $('stage').querySelectorAll('[data-t-plus],[data-t-minus]').forEach(b => b.onclick = () => {
+    const tid = b.dataset.tPlus || b.dataset.tMinus;
+    const d = (b.dataset.tPlus ? 1 : -1) * (Number(G.config.pointsCorrect) || 10);
+    SA.sess.addTeamPoints(SID, VID, tid, d);
+  });
+}
+
+/* ---- QR, generated in this page — no library, no network ---- */
+function showQR() {
+  const base = location.origin + location.pathname.replace(/host\.html$/, '').replace(/\/host$/, '/');
+  const link = base + '?c=' + encodeURIComponent(INFO.code || '') + (VID ? '&v=' + encodeURIComponent(VID) : '');
+  const el = document.createElement('div');
+  el.className = 'ovl';
+  el.innerHTML = `<div class="box card col tc" style="gap:14px">
+      <h3 style="font-size:19px">${SA.esc(INFO.title)}</h3>
+      <div id="qr" class="center" style="background:#fff;padding:16px;border-radius:14px;min-height:200px"></div>
+      <div class="codebig" style="padding:0">${SA.esc(INFO.code)}</div>
+      <div class="sm mut" style="word-break:break-all">${SA.esc(link)}</div>
+      <div class="row" style="gap:8px;justify-content:center">
+        <button class="btn" onclick="window.print()">🖨 ${SA.t('host.print')}</button>
+        <button class="btn ghost" data-no>${SA.t('close')}</button></div>
+    </div>`;
+  document.body.appendChild(el);
+  el.querySelector('[data-no]').onclick = () => el.remove();
+  el.onclick = e => { if (e.target === el) el.remove(); };
+
+  try {
+    el.querySelector('#qr').innerHTML =
+      `<div style="width:240px;max-width:60vw">${SA.qr.svg(link)}</div>`;
+  } catch (e) {
+    el.querySelector('#qr').innerHTML = `<div class="mut sm" style="color:#333">${SA.t('host.qr_fail')}</div>`;
+  }
+}
+
+/* ---- the countdown, driven from one timer for the whole page ---- */
+function startTick() {
+  clearInterval(tick);
+  tick = setInterval(() => {
+    if (!LIVE.endAt) return;
+    const left = LIVE.endAt - SA.db.now();
+    if (left <= 0 && LIVE.open) {
+      act({ open: false, phase: 'closed' });
+      log(SA.t('host.time_up'));
+    }
+  }, 400);
+}
+
+/* ═══════════ KEYBOARD ═══════════ */
+document.addEventListener('keydown', e => {
+  if (!SID || e.ctrlKey || e.metaKey || e.altKey) return;
+  const tag = (e.target.tagName || '').toLowerCase();
+  if (tag === 'input' || tag === 'textarea' || tag === 'select' || e.target.isContentEditable) return;
+
+  const k = e.key.toLowerCase();
+  const map = {
+    'l': randomUnused,
+    '0': () => act({ screen: 'blank' }),
+    '9': () => act({ screen: 'leaderboard' }),
+    '1': () => { const it = curItem();
+                 if (it && LIVE.itemId !== it.id) pushItem();
+                 else act({ phase: 'shown', screen: 'round', open: false, reveal: false }); },
+    '2': () => act({ phase: 'options', screen: 'round' }),
+    '3': () => { const r = curRound(); const secs = Number((r && r.config && r.config.timer) || 30);
+                 act({ phase: 'open', open: true, screen: 'round',
+                       startAt: SA.db.now(), endAt: secs ? SA.db.now() + secs * 1000 : 0 }); },
+    '4': () => act({ phase: 'closed', open: false }),
+    '5': () => act({ phase: 'reveal', reveal: true, open: false }),
+    'arrowright': () => stepItem(1),
+    'arrowleft': () => stepItem(-1)
+  };
+  if (map[k]) { e.preventDefault(); map[k](); }
+});
+</script>
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

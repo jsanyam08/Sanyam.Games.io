@@ -1,0 +1,776 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>कौन बनेगा सिद्धात्मा — Main Screen</title>
+
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Mukta:wght@400;600;700;800&family=Poppins:wght@700;800;900&display=swap');
+
+/* ---------- DARK (default) ---------- */
+:root{
+  --bg:#03060f; --bg2:#070d1f; --panel:rgba(16,28,60,.95); --panel2:rgba(6,12,28,.95);
+  --line:#24365f; --line-soft:#1a2744;
+  --gold:#ffcf2e; --gold-dk:#8a6206; --gold-lt:#fff0b3;
+  --blue:#1b3a8f; --blue-lt:#3d6fe0;
+  --green:#12c98a; --green-dk:#0a7a55; --green-deep:#044733;
+  --red:#f0433f; --red-dk:#8f1411; --red-deep:#4a0a08;
+  --tx:#ffffff; --tx-mut:#8fa6cc; --tx-soft:#cfe0f5;
+  --glow: rgba(30,70,180,.20);
+}
+/* ---------- LIGHT ---------- */
+html[data-theme="light"]{
+  --bg:#f3f1e9; --bg2:#fffdf6; --panel:rgba(255,255,255,.96); --panel2:rgba(250,247,238,.96);
+  --line:#d8cfae; --line-soft:#e6dfc6;
+  --gold:#a8790a; --gold-dk:#d9b445; --gold-lt:#6b4c05;
+  --blue:#2a53c0; --blue-lt:#5e8ef0;
+  --green:#0a8f62; --green-dk:#c8f2e2; --green-deep:#e3faf2;
+  --red:#c8302c; --red-dk:#ffdcdb; --red-deep:#fff0ef;
+  --tx:#1a1c22; --tx-mut:#6b6f7a; --tx-soft:#33363f;
+  --glow: rgba(180,150,40,.16);
+}
+
+*{box-sizing:border-box;margin:0;padding:0;font-family:'Mukta',sans-serif}
+html,body{height:100%;overflow:hidden;background:var(--bg)}
+body{color:var(--tx);cursor:none;user-select:none;transition:background .35s,color .35s}
+
+/* ─── FIXED DESIGN CANVAS ───────────────────────────────────────────
+   The whole screen is authored at exactly 1920x1080 and then scaled to
+   whatever the projector actually is. Every screen — laptop, 4:3
+   projector, 4K TV — gets a pixel-identical layout, just bigger or
+   smaller. Nothing shifts position when you move the window.          */
+#canvas{position:absolute;top:50%;left:50%;width:1920px;height:1080px;
+  transform:translate(-50%,-50%);transform-origin:center center;overflow:hidden;background:var(--bg)}
+#canvas::before{content:'';position:absolute;inset:0;pointer-events:none;z-index:0;
+  background:radial-gradient(ellipse 80% 60% at 50% 45%, var(--glow), transparent 70%)}
+
+/* Devanagari display type — NEVER letter-space this script */
+.dev{font-family:'Baloo 2','Mukta',sans-serif;letter-spacing:normal}
+
+.stage{position:relative;z-index:1;width:100%;height:100%;display:flex;align-items:center;justify-content:center;padding:32.4px 76.8px}
+.scr{display:none;width:100%;max-width:1500px;flex-direction:column;align-items:center;gap:28.1px;animation:in .4s ease}
+.scr.on{display:flex}
+@keyframes in{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+
+/* ======== META ROW — sits directly above the question ======== */
+.meta{width:100%;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:38.4px;min-height:97.2px}
+.meta-l{display:flex;gap:19.2px;align-items:center;justify-self:start}
+.meta-c{justify-self:center}
+.meta-r{justify-self:end;text-align:right}
+
+.llb{width:71.3px;height:71.3px;border-radius:50%;border:2px solid var(--gold-dk);
+  background:radial-gradient(circle at 34% 28%, var(--panel), var(--panel2));
+  display:flex;align-items:center;justify-content:center;font-size:16.7px;font-weight:800;
+  color:var(--gold);position:relative;transition:.4s;flex-shrink:0}
+.llb.used{opacity:.28;border-color:var(--line);color:var(--tx-mut)}
+.llb.used::after{content:'';position:absolute;inset:-2px;border-radius:50%;
+  background:linear-gradient(45deg,transparent 45%,var(--red) 46%,var(--red) 54%,transparent 55%)}
+
+.lvlbox .k{font-size:15.1px;color:var(--tx-mut);font-weight:700;text-transform:uppercase;letter-spacing:1.2px}
+.lvlbox .v{font-size:27px;font-weight:800;color:var(--gold);line-height:1.2}
+
+/* timer — centred, above the question */
+.tmr{display:flex;align-items:center;justify-content:center;gap:21.1px;
+  background:var(--panel2);border:2px solid var(--gold-dk);border-radius:99px;padding:9.7px 38.4px;
+  min-width:162px;transition:.3s}
+.tmr .ring{width:58.3px;height:58.3px;position:relative;flex-shrink:0}
+.tmr .ring svg{transform:rotate(-90deg)}
+.tmr .bgc{fill:none;stroke:var(--line-soft);stroke-width:9}
+.tmr .fgc{fill:none;stroke:var(--green);stroke-width:9;stroke-linecap:round;transition:stroke-dashoffset .25s linear,stroke .3s}
+.tmr .num{font-family:'Poppins',sans-serif;font-size:34.6px;font-weight:800;color:var(--tx);min-width:2.6ch;text-align:center}
+.tmr.warn{border-color:var(--gold)} .tmr.warn .fgc{stroke:var(--gold)} .tmr.warn .num{color:var(--gold)}
+.tmr.crit{border-color:var(--red)}  .tmr.crit .fgc{stroke:var(--red)}
+.tmr.crit .num{color:var(--red);animation:beat .55s infinite}
+@keyframes beat{0%,100%{transform:scale(1)}50%{transform:scale(1.13)}}
+.tmr.off{visibility:hidden}
+
+/* ======== QUESTION ======== */
+.qplate{width:100%;position:relative;padding:34.6px 76.8px;text-align:center;
+  background:linear-gradient(180deg,var(--panel),var(--panel2));
+  border:2px solid var(--gold-dk);border-radius:14px;
+  box-shadow:0 0 50px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.06)}
+.qtext{font-size:43.2px;font-weight:800;line-height:1.4;color:var(--tx)}
+
+.opts{width:100%;display:grid;grid-template-columns:1fr 1fr;gap:16.2px 42.2px}
+.opts.hidden{visibility:hidden}
+.opt{display:flex;align-items:center;gap:25px;padding:22.7px 38.4px;
+  background:linear-gradient(180deg,var(--panel),var(--panel2));
+  border:2px solid var(--line);border-radius:10px;font-size:31.3px;font-weight:700;
+  transition:.35s;min-height:88.6px;color:var(--tx)}
+.opt .k{color:var(--gold);font-weight:800;font-family:'Poppins',sans-serif;flex-shrink:0;font-size:31.3px}
+.opt .v{flex:1;line-height:1.3}
+.opt.gone{opacity:0;transform:scale(.92);pointer-events:none}
+.opt.locked{border-color:var(--gold);box-shadow:0 0 32px rgba(255,207,46,.4);animation:lockp 1s ease-in-out infinite}
+@keyframes lockp{0%,100%{box-shadow:0 0 26px rgba(255,207,46,.3)}50%{box-shadow:0 0 50px rgba(255,207,46,.58)}}
+.opt.correct{border-color:var(--green);background:linear-gradient(180deg,var(--green-dk),var(--green-deep));
+  box-shadow:0 0 44px rgba(18,201,138,.5);animation:none}
+.opt.wrong{border-color:var(--red);background:linear-gradient(180deg,var(--red-dk),var(--red-deep));
+  box-shadow:0 0 34px rgba(240,67,63,.42);animation:none}
+
+/* ======== IDLE ======== */
+.logo{text-align:center;display:flex;flex-direction:column;gap:17.3px;align-items:center}
+/* generous line-height + padding so Devanagari matras above and below are never clipped */
+.logo h1{font-family:'Baloo 2','Mukta',sans-serif;font-size:108px;font-weight:800;line-height:1.5;
+  letter-spacing:normal;overflow:visible;
+  filter:drop-shadow(0 4px 22px rgba(255,207,46,.25))}
+/* each line carries its own gradient, so line 1 never lands on the pale end of a shared one */
+.logo h1 span{display:block;padding:.12em .18em;
+  background:linear-gradient(180deg,#fff6d0 8%,var(--gold) 55%,#b8860b 100%);
+  -webkit-background-clip:text;background-clip:text;color:transparent}
+html[data-theme="light"] .logo h1{filter:drop-shadow(0 2px 5px rgba(92,65,4,.2))}
+html[data-theme="light"] .logo h1 span{
+  background:linear-gradient(180deg,#c08c0c 0%,#8a6206 50%,#5c4104 100%);
+  -webkit-background-clip:text;background-clip:text}
+.logo .sub{font-family:'Baloo 2','Mukta',sans-serif;font-size:29.2px;color:var(--tx-mut);font-weight:600;letter-spacing:normal}
+.rings{position:absolute;width:712.8px;height:712.8px;border:1px solid var(--line-soft);border-radius:50%;
+  animation:spin 28s linear infinite;pointer-events:none}
+.rings::after{content:'';position:absolute;inset:75.6px;border:1px solid var(--line-soft);border-radius:50%}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ======== LADDER — levels only ======== */
+.ladwrap{width:min(820px,1766.4px);display:flex;flex-direction:column;gap:15.1px;align-items:center}
+.ladwrap h2{font-family:'Baloo 2',sans-serif;font-size:34.6px;color:var(--gold);font-weight:800}
+.ladder{width:100%;display:flex;flex-direction:column-reverse;gap:4.9px}
+.rung{display:flex;align-items:center;gap:26.9px;padding:12.4px 42.2px;border-radius:7px;
+  font-size:25.4px;font-weight:700;color:var(--tx-mut);border:1px solid transparent;transition:.3s}
+.rung .n{font-family:'Poppins',sans-serif;font-weight:800;min-width:3ch;opacity:.8}
+.rung.safe{color:var(--gold-lt);background:var(--panel2);border-color:var(--line)}
+.rung.won{color:var(--green)}
+.rung.cur{background:linear-gradient(90deg,var(--gold-dk),var(--gold));color:#141206;
+  border-color:var(--gold-lt);box-shadow:0 0 34px rgba(255,207,46,.45);transform:scale(1.035)}
+html[data-theme="light"] .rung.cur{color:#fff}
+
+/* ======== PANELS ======== */
+.panel{width:min(1100px,1766.4px);background:linear-gradient(180deg,var(--panel),var(--panel2));
+  border:2px solid var(--gold-dk);border-radius:16px;padding:43.2px 76.8px;text-align:center;
+  box-shadow:0 0 50px rgba(0,0,0,.5)}
+.panel h2{font-family:'Baloo 2',sans-serif;font-size:35.6px;color:var(--gold);font-weight:800;margin-bottom:23.8px}
+.panel p{font-size:30.2px;line-height:1.7;color:var(--tx-soft)}
+.big-answer{font-size:37.8px;font-weight:800;color:var(--green);margin-bottom:21.6px}
+.lvlline{font-size:28.1px;color:var(--gold);font-weight:800;margin-top:21.6px}
+
+/* ======== POLL GRAPH — fixed, no overflow ======== */
+.pollcard{width:min(1150px,1785.6px);background:linear-gradient(180deg,var(--panel),var(--panel2));
+  border:2px solid var(--gold-dk);border-radius:16px;padding:32.4px 57.6px 25.9px;
+  display:flex;flex-direction:column;gap:21.6px;box-shadow:0 0 50px rgba(0,0,0,.5)}
+.pollcard h2{font-family:'Baloo 2',sans-serif;font-size:32.4px;color:var(--gold);font-weight:800;text-align:center}
+.bars{display:grid;grid-template-columns:repeat(4,1fr);gap:57.6px;height:432px;align-items:end}
+.bcol{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;gap:10.8px;min-width:0}
+.bcol .pct{font-size:32.4px;font-weight:800;color:var(--gold);font-family:'Poppins',sans-serif;line-height:1;flex-shrink:0}
+.bcol .track{flex:1;width:100%;display:flex;align-items:flex-end;min-height:0}
+.bcol .bar{width:100%;background:linear-gradient(180deg,var(--blue-lt),var(--blue));border-radius:8px 8px 0 0;
+  border:1px solid var(--blue-lt);transition:height 1.1s cubic-bezier(.2,.9,.3,1);min-height:6px}
+.bcol .lab{font-size:27px;font-weight:800;color:var(--tx);flex-shrink:0}
+.polltot{text-align:center;font-size:20.5px;color:var(--tx-mut)}
+.pollhead{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:38.4px}
+.pollhead h2{grid-column:2}
+.pollhead .side{grid-column:3;justify-self:end}
+
+/* ---- INLINE POLL STRIP — sits under the options, never resizes them ---- */
+.pollstrip{width:100%;display:none;align-items:center;gap:46.1px;
+  background:linear-gradient(180deg,var(--panel),var(--panel2));
+  border:2px solid var(--gold-dk);border-radius:12px;padding:17.3px 46.1px}
+.pollstrip.on{display:flex}
+.pollstrip .pl{font-family:'Baloo 2',sans-serif;font-size:21.6px;font-weight:800;color:var(--gold);
+  writing-mode:horizontal-tb;white-space:nowrap;line-height:1.5;flex-shrink:0;max-width:307.2px}
+.pollstrip .pl small{display:block;font-size:15.1px;color:var(--tx-mut);font-weight:700}
+.pibars{flex:1;display:grid;grid-template-columns:repeat(4,1fr);gap:30.7px;height:140.4px;align-items:end}
+.pib{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;gap:5.4px;min-width:0}
+.pib .v{font-size:20.5px;font-weight:800;color:var(--gold);font-family:'Poppins',sans-serif;line-height:1;flex-shrink:0}
+.pib .tr{flex:1;width:100%;display:flex;align-items:flex-end;min-height:0}
+.pib .br{display:block;width:100%;background:linear-gradient(180deg,var(--blue-lt),var(--blue));
+  border:1px solid var(--blue-lt);border-radius:5px 5px 0 0;transition:height 1s cubic-bezier(.2,.9,.3,1);min-height:4px}
+.pib .kk{font-size:19.4px;font-weight:800;color:var(--tx);flex-shrink:0}
+
+/* ---- JOIN / QR ---- */
+.joinwrap{width:min(1250px,1804.8px);display:flex;flex-direction:column;align-items:center;gap:32.4px}
+.joinwrap h2{font-family:'Baloo 2',sans-serif;font-size:47.5px;color:var(--gold);font-weight:800;line-height:1.5}
+.joinrow{display:flex;align-items:center;gap:96px;flex-wrap:wrap;justify-content:center}
+.qrbox{background:#fff;padding:25.9px;border-radius:14px;border:3px solid var(--gold);
+  box-shadow:0 0 50px var(--glow);display:flex;align-items:center;justify-content:center}
+.qrbox img,.qrbox canvas{display:block;width:367.2px !important;height:367.2px !important}
+.joinsteps{display:flex;flex-direction:column;gap:23.8px;max-width:883.2px}
+.step{font-size:28.1px;color:var(--tx);line-height:1.55}
+.step b{color:var(--gold);font-family:'Poppins',sans-serif;margin-right:9.6px}
+.step .en{font-size:21.6px;color:var(--tx-mut)}
+.joinurl{margin-top:10.8px;font-family:'Poppins',sans-serif;font-size:28.1px;font-weight:800;color:var(--gold);
+  background:var(--panel2);border:2px solid var(--gold-dk);border-radius:10px;padding:15.1px 38.4px;
+  word-break:break-all;text-align:center}
+.joincount{font-size:30.2px;font-weight:800;color:var(--green);line-height:1.5}
+
+/* ---- FFF ---- */
+.fffwrap{width:min(1200px,1785.6px);display:flex;flex-direction:column;gap:25.9px;align-items:center}
+.fffitems{width:100%;display:grid;grid-template-columns:repeat(2,1fr);gap:15.1px 42.2px}
+.fffitem{display:flex;align-items:center;gap:25px;padding:21.6px 38.4px;
+  background:linear-gradient(180deg,var(--panel),var(--panel2));
+  border:2px solid var(--line);border-radius:10px;font-size:29.2px;font-weight:700;color:var(--tx);min-height:82.1px}
+.fffitem .n{width:54px;height:54px;border-radius:9px;background:var(--panel2);border:1px solid var(--line);
+  color:var(--tx-mut);display:flex;align-items:center;justify-content:center;font-weight:800;
+  font-family:'Poppins',sans-serif;flex-shrink:0;font-size:24.8px}
+.fffitem.ok{border-color:var(--green);background:linear-gradient(180deg,var(--green-dk),var(--green-deep))}
+.fffitem.ok .n{background:var(--green);color:#03261a;border-color:var(--green)}
+.fffbadge{font-family:'Baloo 2',sans-serif;font-size:25.9px;font-weight:800;color:var(--gold);
+  border:2px solid var(--gold-dk);border-radius:99px;padding:7.6px 38.4px}
+
+/* ======== LEADERBOARD ======== */
+.lbwrap{width:min(900px,1766.4px);display:flex;flex-direction:column;gap:9.7px}
+.lbwrap h2{font-family:'Baloo 2',sans-serif;text-align:center;font-size:34.6px;color:var(--gold);font-weight:800;margin-bottom:13px}
+.lbrow{display:grid;grid-template-columns:86.4px 1fr auto;align-items:center;gap:38.4px;padding:14.6px 42.2px;
+  background:var(--panel2);border:1px solid var(--line);border-radius:9px;font-size:25.9px;font-weight:700;color:var(--tx)}
+.lbrow .r{font-family:'Poppins',sans-serif;font-weight:800;color:var(--gold);font-size:30.2px}
+.lbrow .d{color:var(--green);font-family:'Poppins',sans-serif;font-weight:800}
+.lbrow:nth-child(2){border-color:var(--gold)}
+
+/* ======== CERTIFICATE — English, game name in Hindi ======== */
+.cert{width:min(1000px,1766.4px);aspect-ratio:1.45;background:linear-gradient(150deg,var(--panel),var(--panel2));
+  border:3px double var(--gold);border-radius:12px;padding:43.2px;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:19.4px;text-align:center;
+  box-shadow:0 0 70px var(--glow), inset 0 0 90px rgba(255,207,46,.05)}
+.cert .cap{font-size:20.5px;letter-spacing:6px;color:var(--gold);text-transform:uppercase;font-weight:700}
+.cert .brand{font-family:'Baloo 2',sans-serif;font-size:32.4px;color:var(--gold);font-weight:800;letter-spacing:normal}
+.cert .nm{font-size:60.5px;font-weight:900;font-family:'Poppins',sans-serif;color:var(--tx);line-height:1.1}
+.cert .ln{width:42%;height:2px;background:linear-gradient(90deg,transparent,var(--gold),transparent)}
+.cert .txt{font-size:25.9px;color:var(--tx-soft);line-height:1.65;max-width:82%}
+.cert .lv{font-size:49.7px;font-weight:900;color:var(--gold);font-family:'Poppins',sans-serif;line-height:1.15}
+.cert .lvname{font-family:'Baloo 2',sans-serif;font-size:32.4px;color:var(--gold-lt);font-weight:800}
+
+/* ======== FOOT ======== */
+#conn{position:fixed;bottom:17.3px;left:30.7px;z-index:9;font-size:15.1px;color:var(--tx-mut);
+  display:flex;align-items:center;gap:8px;font-weight:700;opacity:.55}
+#conn .d{width:8px;height:8px;border-radius:50%;background:var(--red)}
+#conn .d.ok{background:var(--green)}
+#who{position:fixed;top:17.3px;left:34.6px;z-index:9;display:flex;align-items:baseline;gap:15.4px}
+#who.hide{display:none}
+#who .n{font-size:21.6px;font-weight:800;color:var(--tx)}
+#who .c{font-size:16.2px;color:var(--gold);font-weight:700}
+
+#tapstart{position:fixed;inset:0;z-index:9999;background:var(--bg);display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:21.6px;cursor:pointer}
+#tapstart h2{font-family:'Baloo 2',sans-serif;color:var(--gold);font-size:47.5px;font-weight:800;letter-spacing:normal}
+#tapstart p{color:var(--tx-mut);font-size:22.7px;text-align:center;max-width:1190.4px;line-height:1.7}
+</style>
+</head>
+<body>
+
+<div id="tapstart">
+  <h2 class="dev">कौन बनेगा सिद्धात्मा</h2>
+  <p>Click anywhere to start the main screen.<br>
+     <span style="font-size:18.4px;opacity:.7">Browsers block audio until the page is clicked once.
+     Then press <b>F11</b> for full screen.</span></p>
+</div>
+
+<div id="canvas">
+
+<div id="who"><span class="n dev" id="p-name"></span><span class="c dev" id="p-city"></span></div>
+
+<div class="stage">
+
+  <!-- IDLE -->
+  <div class="scr on" id="s-idle">
+    <div class="rings"></div>
+    <div class="logo">
+      <h1 class="dev"><span>कौन बनेगा</span><span>सिद्धात्मा</span></h1>
+      <div class="sub dev">आत्मा से परमात्मा तक की यात्रा</div>
+    </div>
+  </div>
+
+  <!-- QUESTION -->
+  <div class="scr" id="s-question">
+    <div class="meta" id="meta-q">
+      <div class="meta-l" id="lls-q"></div>
+      <div class="meta-c"><div class="tmr" id="tmr-q">
+        <div class="ring"><svg viewBox="0 0 100 100" width="100%" height="100%">
+          <circle class="bgc" cx="50" cy="50" r="44"></circle>
+          <circle class="fgc" cx="50" cy="50" r="44" stroke-dasharray="276.46" stroke-dashoffset="0"></circle>
+        </svg></div>
+        <div class="num">30</div>
+      </div></div>
+      <div class="meta-r"><div class="lvlbox">
+        <div class="k">Level <span id="q-lvn">1</span></div>
+        <div class="v dev" id="q-lvname">—</div>
+      </div></div>
+    </div>
+    <div class="qplate"><div class="qtext dev" id="q-text">—</div></div>
+    <div class="opts" id="q-opts">
+      <div class="opt" id="o-A"><span class="k">A</span><span class="v dev"></span></div>
+      <div class="opt" id="o-B"><span class="k">B</span><span class="v dev"></span></div>
+      <div class="opt" id="o-C"><span class="k">C</span><span class="v dev"></span></div>
+      <div class="opt" id="o-D"><span class="k">D</span><span class="v dev"></span></div>
+    </div>
+    <div class="pollstrip" id="poll-inline">
+      <div class="pl dev">दर्शक मतदान<small id="pi-total">—</small></div>
+      <div class="pibars" id="pi-bars"></div>
+    </div>
+  </div>
+
+  <!-- LADDER -->
+  <div class="scr" id="s-ladder">
+    <div class="ladwrap">
+      <h2 class="dev">पड़ाव</h2>
+      <div class="ladder" id="ladder"></div>
+    </div>
+  </div>
+
+  <!-- EXPLANATION -->
+  <div class="scr" id="s-explanation">
+    <div class="panel">
+      <h2 class="dev">उत्तर एवं व्याख्या</h2>
+      <div class="big-answer dev" id="e-ans">—</div>
+      <p class="dev" id="e-text">—</p>
+    </div>
+  </div>
+
+  <!-- POLL WAITING -->
+  <div class="scr" id="s-poll_wait">
+    <div class="meta">
+      <div class="meta-l"></div>
+      <div class="meta-c"><div class="tmr" id="tmr-pw">
+        <div class="ring"><svg viewBox="0 0 100 100" width="100%" height="100%">
+          <circle class="bgc" cx="50" cy="50" r="44"></circle>
+          <circle class="fgc" cx="50" cy="50" r="44" stroke-dasharray="276.46" stroke-dashoffset="0"></circle>
+        </svg></div><div class="num">30</div>
+      </div></div>
+      <div class="meta-r"></div>
+    </div>
+    <div class="panel">
+      <h2 class="dev">दर्शक मतदान</h2>
+      <p class="dev">अपने मोबाइल पर वोट कीजिए<br>
+        <span style="color:var(--gold);font-weight:800">Voting is open on your phones</span></p>
+    </div>
+  </div>
+
+  <!-- POLL RESULT — countdown sits on the right of the heading -->
+  <div class="scr" id="s-poll_result">
+    <div class="pollcard">
+      <div class="pollhead">
+        <h2 class="dev">दर्शक मतदान</h2>
+        <div class="side"><div class="tmr" id="tmr-pr" style="padding:6.5px 23px;min-width:0">
+          <div class="ring"><svg viewBox="0 0 100 100" width="100%" height="100%">
+            <circle class="bgc" cx="50" cy="50" r="44"></circle>
+            <circle class="fgc" cx="50" cy="50" r="44" stroke-dasharray="276.46" stroke-dashoffset="0"></circle>
+          </svg></div><div class="num">30</div>
+        </div></div>
+      </div>
+      <div class="bars" id="poll-bars"></div>
+      <div class="polltot dev" id="poll-total"></div>
+    </div>
+  </div>
+
+  <!-- JOIN / QR -->
+  <div class="scr" id="s-join">
+    <div class="joinwrap">
+      <h2 class="dev">खेल में शामिल हों</h2>
+      <div class="joinrow">
+        <div class="qrbox"><div id="qr"></div></div>
+        <div class="joinsteps">
+          <div class="step"><b>1.</b> <span class="dev">मोबाइल का कैमरा खोलिए</span><br><span class="en">Open your phone camera</span></div>
+          <div class="step"><b>2.</b> <span class="dev">QR कोड स्कैन कीजिए</span><br><span class="en">Scan this QR code</span></div>
+          <div class="step"><b>3.</b> <span class="dev">नाम, आयु और मोबाइल नंबर भरिए</span><br><span class="en">Enter your name, age and mobile</span></div>
+          <div class="joinurl" id="join-url">—</div>
+        </div>
+      </div>
+      <div class="joincount"><span id="join-n">0</span> <span class="dev">दर्शक जुड़ चुके हैं</span> · joined</div>
+    </div>
+  </div>
+
+  <!-- FASTEST FINGER FIRST -->
+  <div class="scr" id="s-fff">
+    <div class="fffwrap">
+      <div class="fffbadge" id="fff-badge">⚡ FASTEST FINGER FIRST</div>
+      <div class="qplate"><div class="qtext dev" id="fff-text">—</div></div>
+      <div class="fffitems" id="fff-items"></div>
+    </div>
+  </div>
+
+  <!-- EXPERT -->
+  <div class="scr" id="s-expert">
+    <div class="panel">
+      <h2 class="dev">विशेषज्ञ की सलाह</h2>
+      <p class="dev">मंच पर उपस्थित विद्वान से परामर्श<br>
+        <span style="color:var(--gold);font-weight:800">Ask the Expert</span></p>
+    </div>
+  </div>
+
+  <!-- CALL -->
+  <div class="scr" id="s-call">
+    <div class="meta">
+      <div class="meta-l"></div>
+      <div class="meta-c"><div class="tmr" id="tmr-call">
+        <div class="ring"><svg viewBox="0 0 100 100" width="100%" height="100%">
+          <circle class="bgc" cx="50" cy="50" r="44"></circle>
+          <circle class="fgc" cx="50" cy="50" r="44" stroke-dasharray="276.46" stroke-dashoffset="0"></circle>
+        </svg></div><div class="num">60</div>
+      </div></div>
+      <div class="meta-r"></div>
+    </div>
+    <div class="panel">
+      <h2 class="dev">फ़ोन-अ-फ्रेंड</h2>
+      <p class="dev">60 सेकंड की बातचीत<br>
+        <span style="color:var(--gold);font-weight:800">Phone a Friend</span></p>
+    </div>
+  </div>
+
+  <!-- WALK AWAY -->
+  <div class="scr" id="s-walkaway">
+    <div class="panel">
+      <h2 class="dev">खेल से विराम</h2>
+      <p class="dev"><span id="w-name"></span> ने खेल यहीं रोकने का निर्णय लिया।</p>
+      <div class="lvlline dev" id="w-lvl">—</div>
+    </div>
+  </div>
+
+  <!-- AUDIENCE QUESTION (mirrored from phones) -->
+  <div class="scr" id="s-audq">
+    <div class="meta">
+      <div class="meta-l"></div>
+      <div class="meta-c"><div class="tmr" id="tmr-audq">
+        <div class="ring"><svg viewBox="0 0 100 100" width="100%" height="100%">
+          <circle class="bgc" cx="50" cy="50" r="44"></circle>
+          <circle class="fgc" cx="50" cy="50" r="44" stroke-dasharray="276.46" stroke-dashoffset="0"></circle>
+        </svg></div><div class="num">30</div>
+      </div></div>
+      <div class="meta-r"></div>
+    </div>
+    <div class="qplate"><div class="qtext dev" id="aq-text">—</div></div>
+    <div class="opts" id="aq-opts">
+      <div class="opt" id="aq-A"><span class="k">A</span><span class="v dev"></span></div>
+      <div class="opt" id="aq-B"><span class="k">B</span><span class="v dev"></span></div>
+      <div class="opt" id="aq-C"><span class="k">C</span><span class="v dev"></span></div>
+      <div class="opt" id="aq-D"><span class="k">D</span><span class="v dev"></span></div>
+    </div>
+  </div>
+
+  <!-- LEADERBOARD -->
+  <div class="scr" id="s-fff_leaderboard">
+    <div class="lbwrap">
+      <h2 class="dev" id="lb-title">Leaderboard</h2>
+      <div id="lb-rows"></div>
+    </div>
+  </div>
+
+  <!-- CERTIFICATE — English only, game name in Hindi -->
+  <div class="scr" id="s-certificate">
+    <div class="cert">
+      <div class="cap">Certificate of Achievement</div>
+      <div class="brand dev">कौन बनेगा सिद्धात्मा</div>
+      <div class="ln"></div>
+      <div class="nm" id="c-name">—</div>
+      <div class="txt">completed the journey up to</div>
+      <div class="lv">LEVEL <span id="c-lvn">1</span></div>
+      <div class="lvname dev" id="c-lvname">—</div>
+      <div class="ln"></div>
+      <div class="cap" style="font-size:16.2px;letter-spacing:4px">Congratulations</div>
+    </div>
+  </div>
+
+</div>
+
+<div id="conn"><span class="d" id="cd"></span><span id="ct">connecting…</span></div>
+
+</div><!-- /#canvas -->
+
+<script>
+/* scale the 1920x1080 canvas to fit whatever screen this window is on */
+(function(){
+  const canvas = document.getElementById('canvas');
+  function fit(){
+    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    canvas.style.transform = `translate(-50%,-50%) scale(${s})`;
+  }
+  fit();
+  window.addEventListener('resize', fit);
+  // moving the window to a projector fires resize late on some drivers
+  setInterval(fit, 1000);
+  if(window.screen && screen.orientation) screen.orientation.addEventListener?.('change', fit);
+})();
+</script>
+
+<script>
+/* ═══ PROJECTOR — reads game_state + mobile_state. Never writes. ═══ */
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBvFw7TNIflcBbms-K4sk_jrqgdzYYJKok",
+  authDomain: "kounbanegasiddhatma.firebaseapp.com",
+  databaseURL: "https://kounbanegasiddhatma-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "kounbanegasiddhatma",
+  storageBucket: "kounbanegasiddhatma.firebasestorage.app",
+  messagingSenderId: "53011686572",
+  appId: "1:53011686572:web:f9b02eb2aed988c9ed6b09"
+};
+/* A NAMED app with memory-only persistence.
+   The host controller lives on the same website and shares the default app's
+   session — if the projector signed in on that one, it would log the host out. */
+const app  = firebase.initializeApp(firebaseConfig, 'projector');
+const db   = firebase.database(app);
+const auth = firebase.auth(app);
+
+/* ---- 14 levels, no prize money ---- */
+const LEVELS = [
+  {n:1,name:"दर्शन प्रतिमा"},{n:2,name:"व्रत प्रतिमा"},{n:3,name:"सामायिक प्रतिमा"},
+  {n:4,name:"प्रोषध प्रतिमा"},{n:5,name:"सचित्त त्याग प्रतिमा"},{n:6,name:"रात्रि भुक्ति त्याग प्रतिमा"},
+  {n:7,name:"ब्रह्मचर्य प्रतिमा",safe:true},{n:8,name:"आरम्भ त्याग प्रतिमा"},
+  {n:9,name:"परिग्रह त्याग प्रतिमा"},{n:10,name:"अनुमति त्याग प्रतिमा"},
+  {n:11,name:"उद्दिष्ट त्याग प्रतिमा"},{n:12,name:"मुनि दीक्षा",safe:true},
+  {n:13,name:"केवलज्ञान"},{n:14,name:"सिद्ध पद",safe:true}
+];
+const $ = id => document.getElementById(id);
+const esc = s => String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+/* ---- ROOM ---- */
+const cleanRoom = s => String(s||'').toUpperCase().replace(/[^A-Z0-9-]/g,'').slice(0,20);
+let ROOM = cleanRoom(new URLSearchParams(location.search).get('room'));
+if(!ROOM){ try { ROOM = cleanRoom(localStorage.getItem('kbs-room')); } catch(e){} }
+if(!ROOM) ROOM = 'MAIN';
+try { localStorage.setItem('kbs-room', ROOM); } catch(e){}
+const R = p => `rooms/${ROOM}/${p}`;
+
+let GS = null, MS = null, srvOffset = 0, lastAudioSeq = -1, ladderBuilt = false, qrFor = null;
+const now = () => Date.now() + srvOffset;
+const CIRC = 2 * Math.PI * 44;
+
+/* screens that show a countdown */
+const TIMER_ON = { question:'tmr-q', poll_wait:'tmr-pw', poll_result:'tmr-pr', call:'tmr-call', audq:'tmr-audq' };
+
+/* ---- AUDIO ---- */
+let actx = null;
+const FILES = { theme:'theme.mp3', suspense:'suspense.mp3', lock:'lock.mp3', correct:'correct.mp3', wrong:'wrong.mp3' };
+const audioEls = {};
+let muted = false;
+function initAudio(){
+  if(actx) return;
+  try{ actx = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){}
+  Object.entries(FILES).forEach(([k,f])=>{
+    const a = new Audio(f); a.preload='auto'; a.loop = (k==='theme');
+    a.addEventListener('error',()=>{ audioEls[k] = null; },{once:true});
+    audioEls[k] = a;
+  });
+}
+function stopAllAudio(){ Object.values(audioEls).forEach(a=>{ if(a){ try{a.pause(); a.currentTime=0;}catch(e){} } }); }
+function tone(freqs,dur,type){
+  if(!actx || muted) return;
+  const t0 = actx.currentTime;
+  freqs.forEach((f,i)=>{
+    const o = actx.createOscillator(), g = actx.createGain();
+    o.type = type||'sine'; o.frequency.value = f;
+    g.gain.setValueAtTime(0, t0+i*dur);
+    g.gain.linearRampToValueAtTime(.2, t0+i*dur+.02);
+    g.gain.exponentialRampToValueAtTime(.001, t0+i*dur+dur);
+    o.connect(g); g.connect(actx.destination);
+    o.start(t0+i*dur); o.stop(t0+i*dur+dur);
+  });
+}
+function synth(c){
+  if(c==='theme') tone([392,523,659,784],.28,'triangle');
+  else if(c==='suspense') tone([110,116,110,116,110],.34,'sawtooth');
+  else if(c==='lock') tone([880,440],.11,'square');
+  else if(c==='correct') tone([523,659,784,1047],.15,'triangle');
+  else if(c==='wrong') tone([220,165,110],.26,'sawtooth');
+}
+function playCue(cmd){
+  if(cmd === 'mute'){ muted = true; stopAllAudio(); return; }
+  if(cmd === 'unmute'){ muted = false; return; }
+  if(cmd === 'stop'){ stopAllAudio(); return; }
+  stopAllAudio();
+  if(muted) return;
+  const el = audioEls[cmd];
+  if(el) el.play().catch(()=>synth(cmd)); else synth(cmd);
+}
+
+$('tapstart').addEventListener('click', ()=>{
+  initAudio();
+  if(actx && actx.state === 'suspended') actx.resume();
+  $('tapstart').style.display = 'none';
+}, {once:true});
+
+/* ---- AUTH ---- */
+auth.setPersistence(firebase.auth.Auth.Persistence.NONE)
+    .catch(()=>{})
+    .then(()=>auth.signInAnonymously())
+    .catch(e=>{ $('ct').textContent = 'auth failed: ' + (e.code || e.message); });
+auth.onAuthStateChanged(u=>{ if(u) start(); });
+
+function start(){
+  db.ref('.info/serverTimeOffset').on('value', s => srvOffset = s.val() || 0);
+  db.ref('.info/connected').on('value', s=>{
+    const ok = s.val() === true;
+    $('cd').classList.toggle('ok', ok);
+    $('ct').textContent = ok ? 'live · ' + ROOM : 'reconnecting…';
+  });
+  db.ref(R('game_state')).on('value', s=>{ GS = s.val(); if(GS) render(); });
+  db.ref(R('mobile_state')).on('value', s=>{ MS = s.val() || {}; if(GS) render(); });
+  $('ct').textContent = 'live · ' + ROOM;
+  // join count comes via game_state — the projector has no permission to read /players
+  buildLadder();
+  setInterval(tick, 120);
+}
+
+/* ---- RENDER ---- */
+function show(id){
+  document.querySelectorAll('.scr').forEach(e=>e.classList.remove('on'));
+  ($('s-'+id) || $('s-idle')).classList.add('on');
+  // contestant name only on question-type screens
+  $('who').classList.toggle('hide', ['idle','certificate','audq','fff','fff_leaderboard','ladder','join'].includes(id));
+}
+
+function render(){
+  document.documentElement.setAttribute('data-theme', GS.theme === 'light' ? 'light' : 'dark');
+
+  const lv = LEVELS.find(l=>l.n === GS.level) || LEVELS[0];
+  $('p-name').textContent = GS.player?.name && GS.player.name !== '—' ? GS.player.name : '';
+  $('p-city').textContent = GS.player?.city ? '· ' + GS.player.city : '';
+  $('q-lvn').textContent = lv.n;
+  $('q-lvname').textContent = lv.name;
+
+  // lifelines live only on the question screen, left of the timer
+  const L = GS.lifelines || {};
+  $('lls-q').innerHTML = [['5050','50:50'],['poll','📊'],['expert','💡'],['call','📞']]
+    .map(([k,lab])=>`<div class="llb${L[k]?' used':''}">${lab}</div>`).join('');
+
+  const q = GS.question;
+  if(q){
+    $('q-text').textContent = q.text;
+    ['A','B','C','D'].forEach(k=>{
+      const o = $('o-'+k);
+      o.querySelector('.v').textContent = q[k.toLowerCase()] || '';
+      o.className = 'opt';
+      if((GS.hidden5050||[]).includes(k)) o.classList.add('gone');
+      if(GS.lockedOption === k && GS.reveal === 'none') o.classList.add('locked');
+      if(GS.reveal === 'correct' || GS.reveal === 'wrong'){
+        if(k === q.correct) o.classList.add('correct');
+        else if(k === GS.lockedOption) o.classList.add('wrong');
+      }
+    });
+    $('q-opts').classList.toggle('hidden', !GS.optionsVisible);
+    $('e-ans').textContent = `${q.correct}: ${q[q.correct.toLowerCase()] || ''}`;
+    $('e-text').textContent = q.explanation || '—';
+  }
+
+  $('w-name').textContent = GS.player?.name && GS.player.name !== '—' ? GS.player.name : 'प्रतिभागी';
+  $('w-lvl').textContent = `Level ${lv.n} — ${lv.name}`;
+  $('c-name').textContent = GS.player?.name && GS.player.name !== '—' ? GS.player.name : '—';
+  $('c-lvn').textContent = lv.n;
+  $('c-lvname').textContent = lv.name;
+
+  if(GS.pollResult){
+    const p = GS.pollResult;
+    $('poll-bars').innerHTML = ['A','B','C','D'].map(k=>{
+      const v = p[k]||0;
+      return `<div class="bcol"><div class="pct">${v}%</div>
+        <div class="track"><div class="bar" style="height:${Math.max(2,v)}%"></div></div>
+        <div class="lab">${k}</div></div>`;
+    }).join('');
+    $('poll-total').textContent = `${p.total} दर्शकों ने मत दिया`;
+
+    // compact version pinned under the options
+    $('pi-bars').innerHTML = ['A','B','C','D'].map(k=>{
+      const v = p[k]||0;
+      return `<div class="pib"><div class="v">${v}%</div>
+        <div class="tr"><div class="br" style="height:${Math.max(3,v)}%"></div></div>
+        <div class="kk">${k}</div></div>`;
+    }).join('');
+    $('pi-total').textContent = `${p.total} votes`;
+  }
+  $('poll-inline').classList.toggle('on', !!GS.pollInline && !!GS.pollResult);
+
+  if(GS.leaderboard){
+    $('lb-title').textContent = GS.leaderboard.title || 'Leaderboard';
+    $('lb-rows').innerHTML = (GS.leaderboard.rows||[]).map(r=>
+      `<div class="lbrow"><span class="r">#${r.rank}</span><span class="dev">${esc(r.name)}</span>
+       <span class="d">${esc(r.detail)}</span></div>`).join('');
+  }
+
+  // FFF mirrored from the phones — same moment the round goes out
+  const f = MS?.fff;
+  if(f){
+    $('fff-text').textContent = f.text;
+    const shown = f.revealed ? (f.correct || []) : (f.display || []);
+    $('fff-badge').textContent = f.revealed ? '✅ सही क्रम · CORRECT ORDER'
+                               : f.open ? '⚡ FASTEST FINGER FIRST — अपने मोबाइल पर क्रम लगाइए'
+                               : '⏹ प्रविष्टियाँ बंद · ENTRIES CLOSED';
+    $('fff-items').innerHTML = shown.map((t,i)=>
+      `<div class="fffitem${f.revealed?' ok':''}">
+         <span class="n">${f.revealed ? i+1 : '?'}</span><span class="dev">${esc(t)}</span></div>`).join('');
+  }
+
+  // audience question mirrored from the phones
+  const aq = MS?.audq;
+  if(aq){
+    $('aq-text').textContent = aq.text;
+    ['A','B','C','D'].forEach(k=>{
+      const o = $('aq-'+k);
+      o.querySelector('.v').textContent = aq[k.toLowerCase()] || '';
+      o.className = 'opt';
+      if(aq.revealed && k === aq.correct) o.classList.add('correct');
+    });
+  }
+
+  // join screen
+  $('join-n').textContent = GS.joinCount || 0;
+  const url = GS.joinUrl || 'https://kounbanegasiddhatma.web.app';
+  $('join-url').textContent = url.replace(/^https?:\/\//, '');
+  if(qrFor !== url){
+    qrFor = url;
+    $('qr').innerHTML = '';
+    try { new QRCode($('qr'), {text:url, width:400, height:400,
+      colorDark:'#000000', colorLight:'#ffffff', correctLevel:QRCode.CorrectLevel.M}); }
+    catch(e){ $('qr').innerHTML = '<div style="color:#000;font-weight:800;padding:20px">QR unavailable — read the link below</div>'; }
+  }
+
+  paintLadder(lv.n);
+  show(GS.screen || 'idle');
+
+  const a = GS.audio;
+  if(a && a.seq !== lastAudioSeq){ lastAudioSeq = a.seq; playCue(a.cmd); }
+}
+
+/* ---- LADDER: levels only ---- */
+function buildLadder(){
+  if(ladderBuilt) return;
+  $('ladder').innerHTML = LEVELS.map(l=>
+    `<div class="rung" data-n="${l.n}">
+       <span class="n">${l.n}</span><span class="dev">${l.name}${l.safe?' ⭐':''}</span>
+     </div>`).join('');
+  ladderBuilt = true;
+}
+function paintLadder(cur){
+  document.querySelectorAll('.rung').forEach(r=>{
+    const n = +r.dataset.n;
+    const lv = LEVELS.find(l=>l.n===n);
+    r.className = 'rung' + (lv.safe?' safe':'') + (n < cur ? ' won':'') + (n === cur ? ' cur':'');
+  });
+}
+
+/* ---- TIMER ---- */
+function remaining(){
+  const t = GS?.timer; if(!t) return 0;
+  if(!t.running) return t.left ?? t.duration ?? 0;
+  return Math.max(0, (t.left ?? t.duration) - (now() - t.startAt)/1000);
+}
+function tick(){
+  const screen = GS?.screen || 'idle';
+  const id = TIMER_ON[screen];
+  Object.values(TIMER_ON).forEach(x=>{ const el = $(x); if(el) el.classList.add('off'); });
+  if(!id) return;
+  const el = $(id); if(!el) return;
+  const t = GS?.timer;
+  const live = t && (t.running || t.paused) && t.label !== 'Ready';
+  if(!live) return;
+  el.classList.remove('off');
+  const left = remaining();
+  const frac = Math.max(0, Math.min(1, left / (t.duration || 1)));
+  const arc = el.querySelector('.fgc');
+  arc.style.strokeDasharray = CIRC;
+  arc.style.strokeDashoffset = CIRC * (1 - frac);
+  el.querySelector('.num').textContent = Math.ceil(left);
+  el.classList.toggle('warn', left <= 10 && left > 5);
+  el.classList.toggle('crit', left <= 5);
+}
+</script>
+</body>
+</html>

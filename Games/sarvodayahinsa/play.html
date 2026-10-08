@@ -1,0 +1,625 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#070b16">
+<meta name="mobile-web-app-capable" content="yes">
+<title>Play — Sarvodaya Ahinsa</title>
+
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+<link rel="stylesheet" href="assets/ui.css?v=1790175980">
+
+<style>
+body{padding-bottom:env(safe-area-inset-bottom)}
+.topbar{
+  position:sticky;top:0;z-index:30;display:flex;align-items:center;gap:10px;
+  padding:9px 14px;background:color-mix(in srgb,var(--panel) 92%,transparent);
+  backdrop-filter:blur(12px);border-bottom:1px solid var(--bd);
+}
+.topbar img{height:30px;display:block}
+/* the logo and the title are one big "leave" target, drawn to look like
+   part of the bar rather than a button, with a small ⌂ so it is clear
+   they do something */
+.leave{
+  background:none;border:0;padding:4px;margin:0;color:inherit;
+  cursor:pointer;border-radius:9px;transition:var(--t);position:relative;
+}
+.leave:hover{background:var(--panel-2)}
+.leave .hm{
+  position:absolute;right:-1px;bottom:-1px;
+  width:15px;height:15px;display:grid;place-items:center;border-radius:50%;
+  background:var(--primary);color:var(--on-primary);font:700 10px/1 var(--fd);
+  box-shadow:0 0 0 2px var(--panel);
+}
+.me{margin-left:auto;text-align:right;line-height:1.2}
+.me b{font:800 20px/1 var(--fd);color:var(--primary)}
+.me span{font-size:10.5px;color:var(--tx-mut);letter-spacing:.08em;text-transform:uppercase}
+#area{padding:14px 14px 96px;max-width:560px;margin:0 auto}
+
+/* Points, where they cannot be missed. The old strip put the score in
+   small grey text at the bottom of the card, and people simply did not
+   see it — the first thing anyone asks in a hall is "how many did I
+   get?", so it gets its own pill at the top and its own banner after
+   every question the host scores. */
+#board-btn{
+  position:fixed;right:14px;bottom:calc(14px + env(safe-area-inset-bottom));z-index:45;
+  box-shadow:0 10px 30px rgba(0,0,0,.45);
+}
+.gotcard{
+  border-radius:var(--r);padding:13px 15px;display:flex;align-items:center;gap:13px;
+  border:1px solid var(--bd-lt);background:var(--panel-2);
+}
+.gotcard .em{font-size:30px;line-height:1;flex:none}
+.gotcard .pts{margin-left:auto;font:800 27px/1 var(--fd);flex:none}
+.gotcard.win{border-color:var(--ok);background:var(--ok-glow)}
+.gotcard.win .pts{color:var(--ok)}
+.gotcard.lose{border-color:var(--bd-lt)}
+.gotcard.lose .pts{color:var(--tx-mut)}
+</style>
+</head>
+<body>
+
+<div id="demo-slot"></div>
+<div class="topbar" id="topbar">
+  <!-- The way out. There was none: once a phone joined a show the only
+       escape was the browser's own back button, so nobody could go and
+       join a second game. Tapping the logo or the title leaves, after
+       asking first — a mis-tap mid-question must not throw them out. -->
+  <button class="leave" id="tb-home" title="">
+    <img id="tb-logo" alt=""><span class="hm">⌂</span>
+  </button>
+  <button class="leave grow" id="tb-home2" style="min-width:0;text-align:left">
+    <span style="font:800 14px/1.2 var(--fd);display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
+          id="tb-title">Sarvodaya Ahinsa</span>
+    <span style="font-size:10.5px;color:var(--tx-mut);display:block" id="tb-sub"></span>
+  </button>
+  <button class="btn sm ghost" id="lang-btn"></button>
+  <button class="btn sm ghost" id="mode-btn">◐</button>
+  <div class="me hide" id="tb-me"><b id="tb-score">0</b><span style="display:block"></span></div>
+</div>
+
+<div id="area"></div>
+<button class="btn p hide" id="board-btn"></button>
+<div id="sheet"></div>
+<div id="toast"></div>
+
+<script src="assets/brand.js?v=1790175980"></script>
+<script src="assets/i18n.js?v=1790175980"></script>
+<script src="assets/theme.js?v=1790175980"></script>
+<script src="assets/text.js?v=1790175980"></script>
+<script src="assets/fb.js?v=1790175980"></script>
+<script src="assets/engine.js?v=1790175980"></script>
+<script src="assets/types/quiz.js?v=1790175980"></script>
+<script src="assets/types/jumble.js?v=1790175980"></script>
+<script src="assets/types/buzzer.js?v=1790175980"></script>
+<script src="assets/types/tambola.js?v=1790175980"></script>
+<script src="assets/types/match.js?v=1790175980"></script>
+<script src="assets/types/custom.js?v=1790175980"></script>
+<script>
+/* ═══ PLAYER (phone) ═════════════════════════════════════════════
+   No account, no password. If they saved a profile on the home page,
+   they are put straight into the show without a form at all.
+   ═══════════════════════════════════════════════════════════════ */
+
+const $ = SA.$;
+let SID = SA.qs('s'), VID = SA.qs('v');
+let INFO = null, LIVE = {}, ME = null, MINE = null, PLAYERS = {}, TEAMS = {}, CLAIMS = {}, VENUES = {};
+let ansRef = null, boundKey = '', tick = null, isLive = false;
+let ASK = { city: 'opt', phone: 'opt', age: 'opt' };
+const scratch = {};
+
+$('demo-slot').innerHTML = SA.ui.demoBanner();
+$('tb-logo').src = SA.brand.logo;
+SA.theme.apply(null, SA.theme.savedMode());
+
+$('lang-btn').textContent = SA.t('lang_toggle');
+$('lang-btn').onclick = () => SA.i18n.toggle();
+/* the audience gets light/dark too — a bright hall and a dark hall are
+   very different places to stare at a phone */
+$('mode-btn').title = SA.t('theme_toggle');
+$('mode-btn').onclick = () => {
+  SA.theme.apply((INFO && INFO.theme) || null,
+                 document.documentElement.dataset.mode === 'light' ? 'dark' : 'light');
+};
+
+/* ---------- leaving ----------
+   Asked, never assumed. Somebody reaching for the language button with a
+   thumb should not lose their place in the show, and the wording has to
+   say the thing they actually want to know: that their points survive. */
+async function leave() {
+  if (!isLive) { location.href = 'index.html'; return; }
+  const ok = await SA.ui.confirm(
+    SA.t('play.leave_q'),
+    SA.esc(SA.t('play.leave_b', { x: (INFO && INFO.code) || '' })),
+    SA.t('play.leave_go'));
+  if (ok) location.href = 'index.html';
+}
+['tb-home', 'tb-home2'].forEach(id => {
+  const el = $(id);
+  el.onclick = leave;
+  el.title = SA.t('play.leave_tip');
+});
+SA.i18n.onChange(() => {
+  $('lang-btn').textContent = SA.t('lang_toggle');
+  $('tb-me').querySelector('span').textContent = SA.t('points');
+  if (isLive) render(); else if (!ME && INFO) joinForm();
+});
+$('tb-me').querySelector('span').textContent = SA.t('points');
+
+const area = html => { $('area').innerHTML = html; };
+const sub = t => { $('tb-sub').textContent = t; };
+
+function fatal(msg) {
+  area(`<div class="card col center tc" style="gap:14px;padding:34px 18px">
+      <img src="${SA.brand.logo}" style="width:96px;opacity:.6" alt="">
+      <div style="font-weight:700">${SA.esc(msg)}</div>
+      <a class="btn p" href="index.html">↩ ${SA.esc(SA.t('play.start'))}</a></div>`);
+}
+
+area(`<div class="col center" style="gap:14px;padding:50px 10px"><div class="spin"></div>
+      <div class="mut">${SA.esc(SA.t('connecting'))}</div></div>`);
+sub(SA.t('connecting'));
+
+/* declared before the call below — onUser can fire synchronously */
+let booted = false;
+
+if (SA.DEMO) boot();
+else SA.auth.onUser(u => {
+  if (u) { boot(); return; }
+  SA.auth.signInAnon().catch(e => fatal(SA.auth.errText(e)));
+});
+
+async function boot() {
+  if (booted) return; booted = true;
+
+  if (!SID) {
+    const c = SA.qs('c');
+    if (c) SID = await SA.sess.byCode(c);
+  }
+  if (!SID) { fatal(SA.t('play.no_code')); return; }
+
+  INFO = await SA.db.ref(SA.sess.P(SID) + '/info').once();
+  if (!INFO) { fatal(SA.t('play.not_found')); return; }
+  if (INFO.status === 'ended') { fatal(SA.t('play.over')); return; }
+
+  SA.theme.apply(INFO.theme || null, SA.theme.savedMode());
+  ASK = Object.assign({ city: 'opt', phone: 'opt', age: 'opt' }, INFO.ask || {});
+  $('tb-title').textContent = INFO.title || SA.brand.name;
+  document.title = (INFO.title || SA.brand.name);
+
+  VENUES = (await SA.db.ref(SA.sess.P(SID) + '/venues').once()) || {};
+  if (!VID || !VENUES[VID]) VID = Object.keys(VENUES)[0] || '';
+
+  const uid = SA.auth.uid;
+  const existing = uid ? await SA.db.ref(SA.sess.P(SID) + '/players/' + uid).once() : null;
+  if (existing && existing.name) { ME = existing; VID = existing.venueId || VID; live(); return; }
+
+  /* The whole point of the saved profile: if there is one, and there is
+     only one venue to be in, they never see a form. But only skip the form
+     when the profile actually satisfies everything this game requires —
+     otherwise they would join with a blank required field. */
+  const p = SA.profile.get();
+  const satisfied = p && ['city', 'phone', 'age'].every(k =>
+    (ASK[k] || 'off') !== 'req' || String(p[k] || '').trim() !== '');
+  if (p && satisfied && Object.keys(VENUES).length <= 1) {
+    doJoin(p.name, p.city, { phone: p.phone, age: p.age }, true);
+    return;
+  }
+
+  joinForm(p);
+}
+
+/* ---------- join ---------- */
+function joinForm(pre) {
+  const p = pre || SA.profile.get() || {};
+  const multi = Object.keys(VENUES).length > 1;
+  const ask = ASK;
+
+  /* One field, shown only if this game asks for it. 'off' renders nothing
+     at all, so a game that does not need a phone number never sees one. */
+  function field(key, type, val, labelKey, phKey) {
+    const mode = ask[key] || 'off';
+    if (mode === 'off') return '';
+    const req = mode === 'req';
+    return `<div><label class="f">${SA.esc(SA.t(labelKey))}
+        <span class="mut">(${SA.esc(req ? SA.t('play.required') : SA.t('optional'))})</span></label>
+      <input type="${type}" id="j-${key}" ${type === 'number' ? 'min="3" max="120"' : 'maxlength="40"'}
+             ${type === 'tel' ? 'inputmode="numeric" maxlength="15"' : ''}
+             value="${SA.esc(val)}" placeholder="${SA.esc(SA.t(phKey))}"></div>`;
+  }
+
+  sub(SA.t('play.join'));
+  area(`
+    <div class="card col" style="gap:14px">
+      <div class="col center tc" style="gap:8px">
+        <img src="${SA.brand.logo}" style="width:84px" alt="">
+        <h2 style="font-size:20px">${SA.esc(INFO.title)}</h2>
+        <span class="pill p">${SA.esc(SA.t('host.code_word'))} ${SA.esc(INFO.code)}</span>
+      </div>
+
+      <div><label class="f">${SA.esc(SA.t('play.name'))}</label>
+        <input type="text" id="j-name" maxlength="40" value="${SA.esc(p.name || '')}"
+               placeholder="${SA.esc(SA.t('play.name_ph'))}" autocomplete="name"></div>
+
+      ${field('city', 'text', p.city || '', 'play.city', 'play.city_ph')}
+      ${field('phone', 'tel', p.phone || '', 'play.phone', 'play.phone_ph')}
+      ${field('age', 'number', p.age || '', 'play.age', 'play.age_ph')}
+
+      ${multi ? `<div><label class="f">${SA.esc(SA.t('play.where'))}</label>
+        <select id="j-venue">
+          ${Object.entries(VENUES).map(([id, v]) => `
+            <option value="${id}" ${id === VID ? 'selected' : ''}>
+              ${SA.esc(v.name)}${v.city ? ' · ' + SA.esc(v.city) : ''}</option>`).join('')}
+        </select></div>` : ''}
+
+      <label class="chk"><input type="checkbox" id="j-remember" checked>
+        ${SA.esc(SA.t('prof.make'))}</label>
+
+      <button class="btn p wide big" id="j-go">▶ ${SA.esc(SA.t('play.join'))}</button>
+      <div class="sm mut tc">${SA.esc(SA.t('play.no_account'))}</div>
+    </div>`);
+
+  $('j-name').focus();
+  const val = k => { const el = $('j-' + k); return el ? el.value.trim() : ''; };
+
+  const go = () => {
+    const name = $('j-name').value.trim();
+    if (!name) { $('j-name').focus(); SA.toast(SA.t('play.name_req'), true); return; }
+    const city = val('city'), phone = val('phone'), age = val('age');
+
+    /* required means required; optional still has to be valid if filled */
+    const need = (k, labelKey) => {
+      if ((ask[k] || 'off') === 'req' && !val(k)) {
+        const el = $('j-' + k); if (el) el.focus();
+        SA.toast(SA.t('play.need_field', { x: SA.t(labelKey) }), true);
+        return true;
+      }
+      return false;
+    };
+    if (need('city', 'play.city') || need('phone', 'play.phone') || need('age', 'play.age')) return;
+    if (phone && !SA.profile.validPhone(phone)) { $('j-phone').focus(); SA.toast(SA.t('play.phone_bad'), true); return; }
+    if (age && !SA.profile.validAge(age))       { $('j-age').focus();   SA.toast(SA.t('play.age_bad'), true); return; }
+
+    if (multi) VID = $('j-venue').value;
+    const btn = $('j-go'); btn.disabled = true; btn.textContent = SA.t('play.joining');
+    if ($('j-remember').checked) SA.profile.save(name, city, phone, age); else SA.profile.clear();
+    doJoin(name, city, { phone, age }, false, () => {
+      btn.disabled = false; btn.textContent = '▶ ' + SA.t('play.join');
+    });
+  };
+  $('j-go').onclick = go;
+  $('j-name').addEventListener('keydown', e => { if (e.key === 'Enter') go(); });
+  ['city', 'phone', 'age'].forEach(k => {
+    const el = $('j-' + k);
+    if (el) el.addEventListener('keydown', e => { if (e.key === 'Enter') go(); });
+  });
+}
+
+function doJoin(name, city, extra, fromProfile, onFail) {
+  SA.sess.join(SID, VID, name, city, extra)
+    .then(() => { ME = { name, city, venueId: VID, score: 0 }; live(fromProfile); })
+    .catch(e => {
+      SA.toast(e.message || SA.t('play.join_fail'), true);
+      if (onFail) onFail(); else joinForm(Object.assign({ name, city }, extra || {}));
+    });
+}
+
+/* ---------- live ---------- */
+function live(auto) {
+  isLive = true;
+  $('tb-me').classList.remove('hide');
+  $('board-btn').classList.remove('hide');
+  const v = VENUES[VID];
+  sub(ME.name + (v && Object.keys(VENUES).length > 1 ? ' · ' + v.name : ''));
+  if (auto) SA.toast(SA.t('prof.hello', { x: ME.name }));
+
+  SA.db.ref(SA.sess.P(SID) + '/live/' + VID).on(l => {
+    const hadQ = JSON.stringify(LIVE.qtop || null);
+    LIVE = l || {};
+    bindAnswers(); render();
+    /* The rank lives in LIVE.scores, which the host republishes a moment
+       after the points land. Repainting only when the player record
+       changed left the button showing the rank from before the last
+       question was scored. */
+    paintScore();
+    /* a top 10 that arrives while the sheet is open should appear in it,
+       not wait for the next tap */
+    if (sheetOpen() && JSON.stringify(LIVE.qtop || null) !== hadQ) openSheet();
+  });
+  SA.db.ref(SA.sess.P(SID) + '/teams/' + VID).on(t => {
+    TEAMS = t || {};
+    /* the phone can be showing the group scores now, so a point given to
+       a stage group has to reach it */
+    if (LIVE.screen === 'teams') render();
+  });
+  SA.db.ref(SA.sess.P(SID) + '/claims/' + VID).on(c => { CLAIMS = c || {}; render(); });
+  /* Only this player's own record. The rules deliberately refuse a phone
+     the whole player list — it holds everybody's mobile number and age —
+     and reading the collection was failing silently, which is why the
+     score in the corner sat on 0 all show. The leaderboard comes from
+     what the host publishes into live state instead. */
+  SA.db.ref(SA.sess.P(SID) + '/players/' + (SA.auth.uid || 'anon')).on(me => {
+    if (!me) return;
+    const tChanged = JSON.stringify(me.ticket || null) !== JSON.stringify((ME || {}).ticket || null);
+    ME = me;
+    $('tb-score').textContent = me.score || 0;
+    /* patched in place — a full redraw would wipe a half-typed answer */
+    paintScore();
+    if (sheetOpen()) openSheet();
+    if (tChanged) render();
+  });
+  SA.db.ref(SA.sess.P(SID) + '/info').on(i => {
+    if (!i) return;
+    const wasEnded = INFO.status === 'ended';
+    INFO = i;
+    if (i.status === 'ended' && !wasEnded) render();
+  });
+
+  clearInterval(tick);
+  tick = setInterval(() => {
+    if (LIVE.endAt && LIVE.open) {
+      const el = $('p-clock');
+      if (el) el.textContent = SA.fmtTime(Math.max(0, LIVE.endAt - SA.db.now()));
+    }
+  }, 300);
+
+  render();
+}
+
+function bindAnswers() {
+  const key = (LIVE.roundId || '') + '/' + (LIVE.itemId || '');
+  if (key === boundKey) return;
+  boundKey = key;
+  if (ansRef) { ansRef.off(); ansRef = null; }
+  MINE = null; scratch.pick = []; scratch.editing = false;
+  scratch.multi = []; scratch.slider = null; scratch.rating = 0;
+  scratch.msel = null; scratch.mfocus = null;
+  if (!LIVE.roundId || !LIVE.itemId) return;
+  const uid = SA.auth.uid || 'anon';
+  ansRef = SA.db.ref(SA.sess.P(SID) + '/answers/' + LIVE.roundId + '/' + LIVE.itemId + '/' + uid);
+  ansRef.on(a => { MINE = a || null; render(); });
+}
+
+function submit(value) {
+  MINE = { v: value, at: Date.now() };      // optimistic — the tap must feel instant
+  SA.sess.submit(SID, LIVE.roundId, LIVE.itemId, value)
+    .catch(() => { SA.toast(SA.t('play.answer_fail'), true); MINE = null; render(); });
+}
+
+function render() {
+  if (!ME) return;
+
+  if (INFO.status === 'ended') {
+    const rows = boardRows(10);
+    const rank = myRank();
+    closeSheet(); $('board-btn').classList.add('hide');
+    area(`<div class="col" style="gap:14px">
+        <div class="card col center tc" style="gap:10px">
+          <img src="${SA.brand.logo}" style="width:84px" alt="">
+          <h2 style="font-size:20px">${SA.esc(SA.t('play.show_over'))}</h2>
+          <div style="font:800 40px/1 var(--fd);color:var(--primary)">${ME.score || 0}</div>
+          <div class="mut sm">${SA.esc(SA.t('play.your_score'))}${
+            rank ? ' · ' + SA.esc(SA.t('play.rank_n', { x: rank })) : ''}</div>
+        </div>
+        <div class="card"><div class="xs mut" style="margin-bottom:9px">🏆 ${SA.esc(SA.t('play.top10'))}</div>
+          ${SA.render.leaderboard(rows, { meUid: SA.auth.uid || '' })}</div>
+        <a class="btn ghost wide" href="index.html">↩ ${SA.esc(SA.t('play.more_games'))}</a>
+      </div>`);
+    return;
+  }
+
+  if (LIVE.screen === 'blank') {
+    area(`<div class="col center tc mut" style="gap:14px;padding:56px 10px">
+      <img src="${SA.brand.logo}" style="width:96px;opacity:.5" alt="">
+      <div>${SA.esc(SA.t('play.watch'))}</div></div>`);
+    return;
+  }
+
+  /* Every one of the host's screen buttons moves the phones too, not just
+     the projector. Otherwise a hall told to look at the logo is looking
+     at four hundred phones still showing the last question — and people
+     at the back, who cannot read the big screen anyway, never see what
+     the room is being shown. "Game" brings them all back. */
+  if (LIVE.screen === 'logo' || LIVE.screen === 'qr') {
+    const code = (INFO && INFO.code) || '';
+    area(`<div class="col" style="gap:13px">
+        <div class="card col center tc" style="gap:13px;padding:32px 18px">
+          <img class="float-slow" src="${SA.brand.logo}" style="width:118px" alt="">
+          <div>
+            <div style="font:800 20px/1.25 var(--fd);color:var(--primary)">
+              ${SA.esc((INFO && INFO.title) || SA.brand.name)}</div>
+            <div class="xs mut" style="margin-top:5px">${SA.esc(SA.t('tagline'))}</div>
+          </div>
+          ${LIVE.screen === 'qr' && code ? `
+            <div class="sub col center tc" style="gap:3px;width:100%">
+              <span class="xs mut">${SA.esc(SA.t('play.tell_friend'))}</span>
+              <b style="font:800 27px/1.1 var(--fd);letter-spacing:.2em;color:var(--primary)">${SA.esc(code)}</b>
+            </div>` : ''}
+          <div class="sm mut">${SA.esc(SA.t('play.watch'))}</div>
+        </div>
+        ${gotCard()}
+        ${scoreCard()}</div>`);
+    return;
+  }
+
+  if (LIVE.screen === 'teams') {
+    area(`<div class="col" style="gap:13px">
+        <div class="card"><div class="xs mut" style="margin-bottom:10px">👥 ${SA.esc(SA.t('sc.team_scores'))}</div>
+          ${SA.render.teamBoard(TEAMS, { bars: true })
+            || `<div class="mut tc" style="padding:22px">${SA.esc(SA.t('db.no_teams'))}</div>`}</div>
+        ${gotCard()}
+        ${scoreCard()}</div>`);
+    return;
+  }
+
+  if (LIVE.screen === 'leaderboard' || LIVE.screen === 'qtop') {
+    const q = LIVE.screen === 'qtop';
+    area(`<div class="col" style="gap:13px">
+      <div class="card"><div class="xs mut" style="margin-bottom:9px">${
+          q ? '⚡ ' + SA.esc(SA.t('play.board_q')) : '🏆 ' + SA.esc(SA.t('play.top10'))}</div>
+        ${q ? SA.render.qtop(LIVE.qtop || [])
+            : SA.render.leaderboard(boardRows(10), { meUid: SA.auth.uid || '' })}</div>
+      ${gotCard()}
+      ${scoreCard()}</div>`);
+    return;
+  }
+
+  const round = LIVE.roundMeta || null;
+  if (!round) {
+    area(`<div class="col center tc mut" style="gap:14px;padding:50px 10px">
+      <img src="${SA.brand.logo}" style="width:96px;opacity:.55" alt="">
+      <div>${SA.esc(SA.t('play.wait_show'))}</div>
+      <div class="sm">${SA.esc(SA.t('play.youre_in'))}</div></div>`);
+    return;
+  }
+
+  const wrap = document.createElement('div');
+  wrap.className = 'col';
+  wrap.style.gap = '13px';
+
+  if (LIVE.open && LIVE.endAt) {
+    const t = document.createElement('div');
+    t.className = 'tc';
+    t.innerHTML = `<span class="pill p" style="font-size:15px">⏱ <b id="p-clock">
+      ${SA.fmtTime(Math.max(0, LIVE.endAt - SA.db.now()))}</b></span>`;
+    wrap.appendChild(t);
+  }
+
+  /* The moment the host gives points, say so. Watching a total tick up
+     silently in the corner is not the same as being told you got it. */
+  wrap.insertAdjacentHTML('beforeend', gotCard());
+
+  const panel = document.createElement('div');
+  wrap.appendChild(panel);
+  wrap.insertAdjacentHTML('beforeend', scoreCard());
+
+  /* Attach BEFORE drawing the round. A type's playerView wires its own
+     buttons by id, and getElementById finds nothing while the node is
+     still detached — which silently left every Send button dead. */
+  $('area').innerHTML = '';
+  $('area').appendChild(wrap);
+
+  SA.types.call(round.type, 'playerView', panel, {
+    sid: SID, vid: VID, live: LIVE, round,
+    me: ME, mine: MINE, players: PLAYERS, teams: TEAMS, claims: CLAIMS,
+    submit, scratch, rerender: render
+  });
+}
+
+function scoreCard() { return `<div class="sub spread" id="p-score">${scoreInner()}</div>`; }
+function scoreInner() {
+  if (!ME) return '';
+  return `<span class="sm"><b>${SA.esc(ME.name)}</b>${
+            ME.city ? `<span class="mut"> · ${SA.esc(ME.city)}</span>` : ''}</span>
+          <span class="sm"><b style="color:var(--primary)">${ME.score || 0}</b> ${SA.esc(SA.t('points'))}${
+            myRank() ? ` <span class="mut">· ${SA.esc(SA.t('play.rank_n', { x: myRank() }))}</span>` : ''}</span>`;
+}
+function paintScore() {
+  const el = $('p-score'); if (el) el.innerHTML = scoreInner();
+  const b = $('board-btn');
+  if (b) b.textContent = `🏆 ${SA.t('play.top10')}${myRank() ? ' · #' + myRank() : ''}`;
+}
+
+/* Both of these come from live state, not from the player list — a phone
+   is not allowed to read that. LIVE.board is the top ten the host
+   published; LIVE.scores is every score with no names on it, which is
+   enough to work out exactly where you stand without knowing anybody. */
+const boardRows = n => (LIVE.board || []).slice(0, n || 10);
+const totalPlayers = () => Number(LIVE.boardN || (LIVE.scores || []).length ||
+                                  Object.keys(PLAYERS).length || 0);
+const myRank = () => (ME && LIVE.scores) ? SA.sess.rankIn(LIVE.scores, ME.score || 0) : 0;
+
+/* ---------- what you just earned ---------- */
+function gotCard() {
+  /* ok / pts appear on the answer only once the host has settled the
+     question; before that there is nothing honest to show. */
+  if (!MINE || MINE.ok === undefined) {
+    if (MINE && MINE.v != null && LIVE.reveal) {
+      return `<div class="gotcard"><span class="em">⏳</span>
+        <span class="sm mut">${SA.esc(SA.t('play.waiting_pts'))}</span></div>`;
+    }
+    return '';
+  }
+  const pts = Number(MINE.pts || 0);
+  /* three outcomes, not two — a type that gives part marks can hand out
+     points for an answer that was not fully right, and calling that
+     "Correct!" in front of somebody who can see their own mistakes is
+     worse than saying nothing */
+  const full = MINE.ok === true;
+  const part = !full && pts > 0;
+  const win = full || part;
+  return `<div class="gotcard ${win ? 'win' : 'lose'} pop-in">
+      <span class="em">${full ? '🎉' : part ? '👍' : '🙏'}</span>
+      <span>
+        <b style="font:800 16px/1.2 var(--fd)">${SA.esc(
+          full ? SA.t('play.correct') : part ? SA.t('play.part_right') : SA.t('play.wrong'))}</b>
+        <span class="sm mut" style="display:block">${SA.esc(
+          pts ? SA.t('play.got_pts', { x: pts }) : SA.t('play.got_none'))}</span>
+      </span>
+      <span class="pts">${pts > 0 ? '+' : ''}${pts}</span>
+    </div>`;
+}
+
+/* ---------- the audience's own top 10 ----------
+   Two boards, because they answer two different questions: "who is
+   winning?" and "did I make the cut on THAT one?". The per-question
+   list is whatever the host published when they gave points — phones
+   cannot read the answers node, so there is nothing else to read.    */
+let sheetTab = 'all';
+function openSheet(tab) {
+  if (tab) sheetTab = tab;
+  const rows = boardRows(10);
+  const q = LIVE.qtop || [];
+  const meUid = SA.auth.uid || '';
+  $('sheet').innerHTML = `
+    <div class="sheet" id="sheet-bg">
+      <div class="panel-in" id="sheet-panel">
+        <div class="spread">
+          <b style="font:800 17px/1 var(--fd)">🏆 ${SA.esc(SA.t('play.board'))}</b>
+          <button class="btn sm ghost" id="sheet-x">✕ ${SA.esc(SA.t('play.board_hide'))}</button>
+        </div>
+        <div class="tabs">
+          <button class="${sheetTab === 'all' ? 'on' : ''}" data-tab="all">${SA.esc(SA.t('play.board_all'))}</button>
+          <button class="${sheetTab === 'q' ? 'on' : ''}" data-tab="q">${SA.esc(SA.t('play.board_q'))}</button>
+        </div>
+        <div class="scroll">
+          ${sheetTab === 'q'
+            ? SA.render.qtop(q)
+            : SA.render.leaderboard(rows, { meUid })}
+        </div>
+        <div class="sub spread">
+          <span class="sm"><b>${SA.esc(SA.t('play.you'))}</b>${
+            myRank() ? ` <span class="mut">· ${SA.esc(SA.t('play.rank_n', { x: myRank() }))} ${
+              SA.esc(SA.t('play.of_n', { x: totalPlayers() }))}</span>` : ''}</span>
+          <span class="sm"><b style="color:var(--primary);font-size:17px">${ME ? (ME.score || 0) : 0}</b>
+            ${SA.esc(SA.t('points'))}</span>
+        </div>
+      </div>
+    </div>`;
+  $('sheet-x').onclick = closeSheet;
+  $('sheet-bg').onclick = e => { if (e.target.id === 'sheet-bg') closeSheet(); };
+  $('sheet').querySelectorAll('[data-tab]').forEach(b => b.onclick = () => openSheet(b.dataset.tab));
+}
+const closeSheet = () => { $('sheet').innerHTML = ''; };
+const sheetOpen = () => !!$('sheet').firstChild;
+
+$('board-btn').onclick = () => { if (sheetOpen()) closeSheet(); else openSheet(); };
+</script>
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
+

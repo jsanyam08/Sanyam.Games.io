@@ -1,0 +1,901 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Game Studio — Sarvodaya Ahinsa</title>
+
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+<link rel="stylesheet" href="assets/ui.css?v=1790175980">
+
+<style>
+/* The preview holds a full-size projector stage scaled down to fit, so
+   the frame clips it and the stage is pinned to the top-left corner of
+   that frame — otherwise the transform would leave it hanging out. */
+#prev-frame{
+  position:relative;overflow:hidden;border-radius:var(--r);
+  background:var(--bg);border:1px solid var(--bd);
+}
+#prev-stage{position:absolute;top:0;left:0;transform-origin:top left;pointer-events:none}
+
+.shell{display:grid;grid-template-columns:266px 1fr;gap:16px;align-items:start;padding:16px 0}
+@media(max-width:980px){.shell{grid-template-columns:1fr}.side{position:static !important;max-height:none !important}}
+.side{position:sticky;top:64px;max-height:calc(100vh - 80px);overflow:auto}
+.glist{display:flex;flex-direction:column;gap:6px}
+
+.sw{
+  width:100%;aspect-ratio:1.9;border-radius:10px;cursor:pointer;
+  border:2px solid transparent;transition:var(--t);position:relative;overflow:hidden;
+  display:grid;place-items:end center;padding-bottom:5px;
+}
+.sw.on{border-color:#fff;box-shadow:0 0 0 2px var(--primary)}
+.sw span{font:700 10px/1 var(--fd);color:#fff;text-shadow:0 1px 4px #000;letter-spacing:.04em}
+
+.rnd{
+  display:flex;align-items:center;gap:9px;padding:10px 12px;border-radius:var(--r-sm);
+  background:var(--panel-2);border:1px solid var(--bd);cursor:pointer;transition:var(--t);
+}
+.rnd:hover{border-color:var(--primary)}
+.rnd.on{border-color:var(--primary);background:var(--glow)}
+
+.ilist{display:flex;flex-direction:column;gap:5px;max-height:440px;overflow:auto;padding-right:3px}
+.iitem{
+  display:flex;align-items:center;gap:9px;padding:8px 11px;border-radius:7px;
+  background:var(--panel-2);border:1px solid var(--bd);cursor:pointer;font-size:13.5px;transition:var(--t);
+}
+.iitem:hover{border-color:var(--primary)}
+.iitem.on{border-color:var(--primary);background:var(--glow)}
+.iitem .n{flex:none;width:24px;height:24px;display:grid;place-items:center;border-radius:6px;
+  background:var(--bg-deep);font:700 11px/1 var(--fd);color:var(--tx-mut)}
+.iitem .s{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+
+.saved{font-size:11.5px;color:var(--tx-mut);transition:opacity .3s}
+.saved.on{color:var(--ok)}
+</style>
+</head>
+<body>
+
+<div id="demo-slot"></div>
+<div id="hdr-slot-outer"></div>
+
+<div class="wrap">
+<div class="shell">
+
+  <aside class="side card tight col" style="gap:11px">
+    <button class="btn p wide" id="new-game"></button>
+    <div class="xs mut" id="l-mine"></div>
+    <div class="glist" id="game-list"></div>
+    <div style="border-top:1px solid var(--bd);padding-top:10px">
+      <label class="btn sm ghost wide" style="cursor:pointer" id="l-import">
+        <input type="file" id="imp" accept=".json" hidden></label>
+    </div>
+  </aside>
+
+  <main id="editor"></main>
+
+</div>
+</div>
+
+<div id="toast"></div>
+
+<script src="assets/brand.js?v=1790175980"></script>
+<script src="assets/i18n.js?v=1790175980"></script>
+<script src="assets/theme.js?v=1790175980"></script>
+<script src="assets/text.js?v=1790175980"></script>
+<script src="assets/fb.js?v=1790175980"></script>
+<script src="assets/engine.js?v=1790175980"></script>
+<script src="assets/types/quiz.js?v=1790175980"></script>
+<script src="assets/types/jumble.js?v=1790175980"></script>
+<script src="assets/types/buzzer.js?v=1790175980"></script>
+<script src="assets/types/tambola.js?v=1790175980"></script>
+<script src="assets/data/akshaynidhi.js?v=1790175980"></script>
+<script src="assets/types/match.js?v=1790175980"></script>
+<script src="assets/types/custom.js?v=1790175980"></script>
+<script>
+/* ═══ GAME STUDIO ════════════════════════════════════════════════
+   Build a game once; host it as many times as you like. Nothing here
+   touches a running show — a session copies what it needs at the start.
+   ═══════════════════════════════════════════════════════════════ */
+
+const $ = SA.$;
+let GID = null, G = null, RID = null, IID = null, TAB = 'details';
+let dirty = false, saveT = null;
+
+$('demo-slot').innerHTML = SA.ui.demoBanner();
+$('hdr-slot-outer').innerHTML = SA.ui.header({ title: SA.t('st.title') });
+SA.ui.wireMode(() => { chrome(); if (G) render(); else welcome(); });
+
+function chrome() {
+  document.title = SA.t('st.title') + ' — ' + SA.brand.nameEn;
+  const bn = document.querySelector('.brand-n'); if (bn) bn.textContent = SA.t('st.title');
+  $('new-game').textContent = '+ ' + SA.t('st.new_game');
+  $('l-mine').textContent = SA.t('st.my_games');
+  $('l-import').childNodes[0].nodeValue = '📂 ' + SA.t('st.import');
+  const s = $('saved'); if (s && !dirty) s.textContent = SA.t('st.all_saved');
+}
+chrome();
+welcome();
+
+SA.ui.requireAdmin().then(boot);
+
+function boot() {
+  $('hdr-slot').innerHTML = `
+    <span class="saved" id="saved">${SA.esc(SA.t('st.all_saved'))}</span>
+    <a class="btn sm ghost" href="host.html">🎛️ ${SA.esc(SA.t('home.host_panel'))}</a>
+    ${SA.ui.accountChip()}`;
+  SA.ui.wireAccount();
+  SA.db.ref('sa/gameIndex').on(paintGameList);
+  const want = SA.qs('g');
+  if (want) open(want);
+}
+
+function welcome() {
+  if (G) return;
+  $('editor').innerHTML = `
+    <div class="card center col" style="gap:14px;padding:60px 20px;text-align:center">
+      <img src="${SA.brand.logo}" style="width:120px;opacity:.5" alt="">
+      <h2 style="font-size:21px">${SA.esc(SA.t('st.title'))}</h2>
+      <p class="mut" style="max-width:440px">${SA.t('st.welcome')}</p>
+    </div>`;
+}
+
+/* ─────────── game list ─────────── */
+function paintGameList(idx) {
+  const rows = Object.entries(idx || {})
+    .map(([id, g]) => Object.assign({ id }, g))
+    .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+
+  /* the bin sits right on the row — it used to be buried three clicks deep
+     inside the Backup tab, where nobody could find it */
+  $('game-list').innerHTML = rows.length ? rows.map(g => `
+    <div class="gitem ${g.id === GID ? 'on' : ''}" data-g="${g.id}">
+      <span class="ic">${SA.esc(g.icon || '🎯')}</span>
+      <span class="grow" style="min-width:0">
+        <span class="t" style="display:block">${SA.esc(g.title)}</span>
+        <span class="mut" style="font-size:11px">${SA.esc(SA.types.name(g.type))}${
+          g.published ? ' · ' + SA.esc(SA.t('st.publish')) : ''}</span>
+      </span>
+      <span class="dot ${g.published ? 'live' : ''}"></span>
+      <button class="btn sm ghost" data-del="${g.id}" title="${SA.esc(SA.t('st.delete_game'))}"
+              style="padding:4px 7px">🗑</button>
+    </div>`).join('') : `<div class="mut sm">${SA.esc(SA.t('st.none_yet'))}</div>`;
+
+  $('game-list').querySelectorAll('[data-g]').forEach(b => b.onclick = e => {
+    if (e.target.closest('[data-del]')) return;
+    open(b.dataset.g);
+  });
+  $('game-list').querySelectorAll('[data-del]').forEach(b => b.onclick = async () => {
+    const g = rows.find(x => x.id === b.dataset.del);
+    if (!await SA.ui.confirm(SA.t('st.del_game_q'),
+      SA.t('st.del_game_b', { x: SA.esc(g.title) }), SA.t('st.del_forever'))) return;
+    await SA.game.remove(g.id);
+    SA.toast(SA.t('st.deleted'));
+    if (GID === g.id) { GID = null; G = null; history.replaceState(null, '', 'studio.html'); welcome(); }
+  });
+}
+
+/* ─────────── open / save ─────────── */
+async function open(id) {
+  const g = await SA.game.load(id);
+  if (!g) { SA.toast(SA.t('st.game_gone'), true); return; }
+  GID = id; G = g;
+  G.info = G.info || {}; G.config = G.config || {}; G.theme = G.theme || {};
+  const rs = SA.game.roundsOf(G);
+  RID = rs.length ? rs[0].id : null;
+  IID = null;
+  SA.theme.apply(G.theme, SA.theme.savedMode());
+  history.replaceState(null, '', '?g=' + id);
+  render();
+  SA.db.ref('sa/gameIndex').once().then(paintGameList);
+}
+
+function touch() {
+  dirty = true;
+  const s = $('saved'); if (s) { s.textContent = SA.t('st.saving'); s.classList.remove('on'); }
+  clearTimeout(saveT);
+  saveT = setTimeout(flush, 700);
+}
+
+async function flush() {
+  if (!GID || !G) return;
+  G.info.updatedAt = Date.now();
+  try {
+    await SA.db.ref(SA.game.P(GID)).set(G);
+    await SA.game.reindex(GID, G);
+    dirty = false;
+    const s = $('saved'); if (s) { s.textContent = '✓ ' + SA.t('st.saved'); s.classList.add('on'); }
+  } catch (e) {
+    const s = $('saved'); if (s) { s.textContent = '✗ ' + SA.t('st.save_fail'); s.classList.remove('on'); }
+    SA.toast(SA.t('st.save_failed', { x: e.message }), true);
+  }
+}
+window.addEventListener('beforeunload', e => { if (dirty) { flush(); e.preventDefault(); e.returnValue = ''; } });
+
+/* ─────────── new game ─────────── */
+$('new-game').onclick = () => {
+  const el = document.createElement('div');
+  el.className = 'ovl';
+  el.innerHTML = `
+    <div class="box card col" style="gap:14px">
+      <h3 style="font-size:19px">${SA.esc(SA.t('st.new_game'))}</h3>
+      <div><label class="f">${SA.esc(SA.t('st.game_name'))}</label>
+        <input type="text" id="ng-title" placeholder="${SA.esc(SA.t('st.name_ph'))}" autofocus></div>
+      <div><label class="f">${SA.esc(SA.t('st.which_type'))}</label>
+        <div class="col" style="gap:7px">
+          ${SA.types.list().map((t, i) => `
+            <label class="chk sub" style="align-items:flex-start">
+              <input type="radio" name="ngt" value="${t.key}" ${i === 0 ? 'checked' : ''} style="margin-top:3px">
+              <span><b>${t.icon} ${SA.esc(SA.types.name(t.key))}</b>
+                <span class="sm mut" style="display:block">${SA.esc(SA.types.blurb(t.key))}</span></span>
+            </label>`).join('')}
+        </div></div>
+      <div class="row" style="justify-content:flex-end;gap:8px">
+        <button class="btn ghost" data-no>${SA.esc(SA.t('cancel'))}</button>
+        <button class="btn p" data-yes>${SA.esc(SA.t('st.create'))}</button>
+      </div>
+    </div>`;
+  document.body.appendChild(el);
+  el.querySelector('[data-no]').onclick = () => el.remove();
+  el.onclick = e => { if (e.target === el) el.remove(); };
+  el.querySelector('#ng-title').focus();
+  el.querySelector('[data-yes]').onclick = async () => {
+    const title = el.querySelector('#ng-title').value.trim() || SA.t('def.new_game');
+    const type = el.querySelector('[name="ngt"]:checked').value;
+    el.remove();
+    const g = SA.game.blank(type, title);
+    const id = await SA.game.create(g);
+    await SA.game.addRound(id, type, SA.t('def.round_n', { x: 1 }));
+    SA.toast(SA.t('st.created'));
+    open(id);
+  };
+};
+
+/* ─────────── import ─────────── */
+$('imp').onchange = ev => {
+  const f = ev.target.files[0]; if (!f) return;
+  const r = new FileReader();
+  r.onload = async () => {
+    try {
+      const data = JSON.parse(r.result);
+      const g = data.game || data;
+      if (!g.info || !g.info.type) throw new Error(SA.t('st.not_ours'));
+      g.info.title = (g.info.title || SA.t('def.new_game'));
+      g.info.published = false;
+      g.info.createdAt = g.info.updatedAt = Date.now();
+      const id = await SA.game.create(g);
+      SA.toast(SA.t('st.imported'));
+      open(id);
+    } catch (e) { SA.toast(e.message, true); }
+    ev.target.value = '';
+  };
+  r.readAsText(f);
+};
+
+/* ═══════════ RENDER ═══════════ */
+function render() {
+  if (!G) return;
+  const rounds = SA.game.roundsOf(G);
+  $('editor').innerHTML = `
+    <div class="col" style="gap:14px">
+
+      <div class="card spread wrap-r" style="gap:12px">
+        <div class="row" style="gap:12px;min-width:0">
+          <span style="font-size:32px">${SA.esc(G.info.icon || '🎯')}</span>
+          <div style="min-width:0">
+            <div style="font:800 20px/1.2 var(--fd);overflow:hidden;text-overflow:ellipsis">
+              ${SA.esc(G.info.title)}</div>
+            <div class="sm mut">${SA.esc(SA.types.name(G.info.type))} ·
+              ${rounds.length} ${SA.esc(SA.t('rounds'))} ·
+              ${rounds.reduce((n, r) => n + SA.game.itemsOf(G, r.id).length, 0)} ${SA.esc(SA.t('items'))}</div>
+          </div>
+        </div>
+        <div class="row wrap-r" style="gap:7px">
+          <label class="chk"><input type="checkbox" id="pub" ${G.info.published ? 'checked' : ''}>${SA.esc(SA.t('st.publish'))}</label>
+          <button class="btn sm p" id="go-host">▶ ${SA.esc(SA.t('st.run_show'))}</button>
+        </div>
+      </div>
+
+      <div class="tabs">
+        ${[['details','st.tab_details'],['theme','st.tab_theme'],['rounds','st.tab_rounds'],
+           ['content','st.tab_content'],['backup','st.tab_backup']]
+          .map(([k, l]) => `<button data-tab="${k}" class="${TAB === k ? 'on' : ''}">${SA.esc(SA.t(l))}</button>`).join('')}
+      </div>
+
+      <div id="pane"></div>
+    </div>`;
+
+  $('pub').onchange = e => { G.info.published = e.target.checked; touch(); render(); };
+  $('go-host').onclick = async () => { await flush(); location.href = 'host.html?g=' + GID; };
+  $('editor').querySelectorAll('[data-tab]').forEach(b =>
+    b.onclick = () => { TAB = b.dataset.tab; render(); });
+
+  ({ details: paneDetails, theme: paneTheme, rounds: paneRounds,
+     content: paneContent, backup: paneBackup }[TAB] || paneDetails)($('pane'));
+}
+
+/* ─── details ─── */
+function paneDetails(box) {
+  const c = G.config;
+  box.innerHTML = `
+    <div class="card col" style="gap:14px">
+      <div class="grid g2">
+        <div><label class="f">${SA.t('st.game_name')}</label>
+          <input type="text" data-i="title" value="${SA.esc(G.info.title)}"></div>
+        <div><label class="f">${SA.t('st.icon')}</label>
+          <input type="text" data-i="icon" maxlength="4" value="${SA.esc(G.info.icon || '🎯')}"></div>
+      </div>
+      <div><label class="f">${SA.t('st.subtitle')}</label>
+        <input type="text" data-i="subtitle" value="${SA.esc(G.info.subtitle || '')}"
+               placeholder="${SA.esc(SA.t('st.subtitle_ph'))}"></div>
+
+      <div style="border-top:1px solid var(--bd);padding-top:14px">
+        <label class="f">${SA.t('st.who_plays')}</label>
+        <div class="col" style="gap:7px">
+          ${[['both','st.mode_both','st.mode_both_d'],
+             ['stage','st.mode_stage','st.mode_stage_d'],
+             ['public','st.mode_pub','st.mode_pub_d']]
+            .map(([v, t, d]) => `
+            <label class="chk sub" style="align-items:flex-start">
+              <input type="radio" name="pm" value="${v}" ${(c.playMode||'both')===v?'checked':''} style="margin-top:3px">
+              <span><b>${SA.esc(SA.t(t))}</b><span class="sm mut" style="display:block">${SA.esc(SA.t(d))}</span></span>
+            </label>`).join('')}
+        </div>
+      </div>
+
+      <div class="grid g3 ${(c.playMode||'both')==='public'?'hide':''}">
+        <div><label class="f">${SA.t('st.team_count')}</label>
+          <input type="number" min="0" max="8" data-c="teamCount" value="${c.teamCount ?? 5}"></div>
+      </div>
+      <div id="team-names" class="col" style="gap:7px"></div>
+
+      <div style="border-top:1px solid var(--bd);padding-top:14px">
+        <label class="f">${SA.t('st.ask_fields')}</label>
+        <div class="grid g3">
+          ${[['askCity','play.city'],['askPhone','play.phone'],['askAge','play.age']].map(([k, l]) => `
+            <div><label class="f">${SA.esc(SA.t(l))}</label>
+              <select data-a="${k}">
+                ${[['off','st.ask_off'],['opt','st.ask_opt'],['req','st.ask_req']].map(([v, t]) =>
+                  `<option value="${v}" ${(c[k] || 'opt') === v ? 'selected' : ''}>
+                    ${SA.esc(SA.t(t))}</option>`).join('')}
+              </select></div>`).join('')}
+        </div>
+        <div class="sm mut" style="margin-top:7px">${SA.t('st.ask_note')}</div>
+        <div class="sub sm mut" style="margin-top:9px">🔒 ${SA.t('prof.privacy')}</div>
+      </div>
+
+      <div class="grid g3" style="border-top:1px solid var(--bd);padding-top:14px">
+        <div><label class="f">${SA.t('st.pts_right')}</label>
+          <input type="number" data-c="pointsCorrect" value="${c.pointsCorrect ?? 10}"></div>
+        <div><label class="f">${SA.t('st.pts_wrong')}</label>
+          <input type="number" data-c="pointsWrong" value="${c.pointsWrong ?? 0}"></div>
+        <div><label class="f">${SA.t('st.speed_bonus')}</label>
+          <input type="number" min="0" data-c="speedBonus" value="${c.speedBonus ?? 0}"></div>
+      </div>
+      <div class="sm mut">${SA.t('st.speed_note')}</div>
+    </div>`;
+
+  box.querySelectorAll('[data-i]').forEach(el => el.oninput = () => { G.info[el.dataset.i] = el.value; touch(); });
+  box.querySelectorAll('[data-c]').forEach(el => el.oninput = () => {
+    G.config[el.dataset.c] = Number(el.value); touch();
+    if (el.dataset.c === 'teamCount') teamNames();
+  });
+  box.querySelectorAll('[name="pm"]').forEach(el => el.onchange = () => {
+    G.config.playMode = el.value; touch(); render();
+  });
+  box.querySelectorAll('[data-a]').forEach(el => el.onchange = () => {
+    G.config[el.dataset.a] = el.value; touch();
+  });
+  teamNames();
+
+  function teamNames() {
+    const n = Math.max(0, Math.min(8, Number(G.config.teamCount) || 0));
+    if ((G.config.playMode || 'both') === 'public' || !n) { $('team-names').innerHTML = ''; return; }
+    G.config.teamNames = G.config.teamNames || [];
+    $('team-names').innerHTML = `<label class="f">${SA.t('st.team_names')}</label>` +
+      Array.from({ length: n }, (_, i) => `
+        <div class="row" style="gap:8px">
+          <span class="pill" style="min-width:30px;justify-content:center;
+                border-color:${SA.sess.TEAM_COLOURS[i % 8]};color:${SA.sess.TEAM_COLOURS[i % 8]}">${i + 1}</span>
+          <input type="text" data-tn="${i}" class="grow"
+                 value="${SA.esc(G.config.teamNames[i] || SA.t('def.group_n', { x: i + 1 }))}">
+        </div>`).join('');
+    $('team-names').querySelectorAll('[data-tn]').forEach(el => el.oninput = () => {
+      G.config.teamNames[Number(el.dataset.tn)] = el.value; touch();
+    });
+  }
+}
+
+/* ─── theme ─── */
+function paneTheme(box) {
+  const t = G.theme || {};
+  const p = SA.theme.resolve(t);
+  box.innerHTML = `
+    <div class="col" style="gap:14px">
+      <div class="card col" style="gap:12px">
+        <label class="f">${SA.t('st.presets')}</label>
+        <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(104px,1fr))">
+          ${SA.theme.swatches().map(s => `
+            <div class="sw ${(t.preset || 'gold') === s.key && !t.primary ? 'on' : ''}" data-sw="${s.key}"
+                 style="background:linear-gradient(135deg,${s.bg} 40%,${s.primary} 100%)">
+              <span>${SA.esc(SA.i18n.lang === 'hi' ? (s.hi || s.label) : s.label)}</span>
+            </div>`).join('')}
+        </div>
+      </div>
+
+      <div class="card col" style="gap:12px">
+        <label class="f">${SA.t('st.own_colours')}</label>
+        <div class="grid g2">
+          ${[['primary','st.c_primary'],['accent','st.c_accent'],['bg','st.c_bg'],['panel','st.c_panel']]
+            .map(([k, l]) => `
+            <div class="row" style="gap:10px">
+              <input type="color" data-col="${k}" value="${p[k]}">
+              <span class="grow"><b class="sm">${SA.esc(SA.t(l))}</b>
+                <span class="sm mut" style="display:block">${p[k]}</span></span>
+            </div>`).join('')}
+        </div>
+        <button class="btn sm ghost" id="reset-th">↺ ${SA.esc(SA.t('st.reset_look'))}</button>
+      </div>
+
+      <div class="card col" style="gap:10px">
+        <label class="f" style="margin:0">${SA.t('st.preview')}</label>
+        <!-- The real projector renderer, shrunk. See paintPreview. -->
+        <div id="prev-frame"><div id="prev-stage" class="screen-mode"></div></div>
+        <div class="sm mut">${SA.esc(SA.t('st.prev_note'))}</div>
+      </div>
+    </div>`;
+
+  paintPreview();
+
+  box.querySelectorAll('[data-sw]').forEach(el => el.onclick = () => {
+    /* choosing a preset clears hand-picked colours, or it appears not to work */
+    G.theme = { preset: el.dataset.sw };
+    SA.theme.apply(G.theme, SA.theme.savedMode());
+    touch(); paneTheme(box);
+  });
+  box.querySelectorAll('[data-col]').forEach(el => el.oninput = () => {
+    G.theme[el.dataset.col] = el.value;
+    SA.theme.apply(G.theme, SA.theme.savedMode());
+    touch();
+    el.nextElementSibling.querySelector('.mut').textContent = el.value;
+  });
+  $('reset-th').onclick = () => {
+    G.theme = { preset: G.theme.preset || 'gold' };
+    SA.theme.apply(G.theme, SA.theme.savedMode());
+    touch(); paneTheme(box);
+  };
+}
+
+/* ─── the projector preview ───────────────────────────────────────
+   Not a drawing of a projector — the projector. Each type hands over a
+   sample question through its sample() hook, and the same screenView
+   that runs the hall renders it here. A quiz previews as options, a
+   tambola as its 90-cell board, a match as photos and names, and a
+   custom game as whichever blocks the host actually chose.
+
+   The projector's own CSS sizes everything in vw, so the stage is built
+   at the real window width and then scaled down to fit the card. That
+   keeps every proportion exactly as it will appear in the hall. */
+function paintPreview() {
+  const frame = $('prev-frame'), stage = $('prev-stage');
+  if (!frame || !stage) return;
+
+  const type = G.info.type;
+  const t = SA.types.get(type);
+  const s = (t && t.sample) ? t.sample(G) : null;
+
+  if (!s) {
+    stage.innerHTML = SA.render.logoScreen(G.info.title, G.info.subtitle || '');
+  } else {
+    const round = { id: 'prev', type, title: G.info.title,
+                    config: Object.assign({}, (t.defaults && t.defaults()) || {},
+                                          firstRoundConfig(type), s.config || {}) };
+    const item = Object.assign({ id: 'prev' }, s.item);
+    const live = Object.assign({
+      roundId: 'prev', itemId: 'prev', screen: 'round', open: false, reveal: false,
+      roundMeta: round,
+      payload: t.payload ? t.payload(item, s.live || {}, round) : null,
+      board: SAMPLE_BOARD()
+    }, s.live || {});
+    stage.innerHTML = '';
+    SA.types.call(type, 'screenView', stage, {
+      live, round, item, title: G.info.title,
+      teams: SAMPLE_TEAMS(), players: {}, sid: 'prev', vid: 'prev'
+    });
+  }
+  fitPreview();
+  watchPreview();
+  requestAnimationFrame(fitPreview);   // once the card has actually been laid out
+}
+
+/* Uses the round the host has actually set up, if there is one, so the
+   preview reflects their own timer, blocks and options. */
+function firstRoundConfig(type) {
+  const r = SA.game.roundsOf(G).find(x => x.type === type);
+  return (r && r.config) || {};
+}
+
+const SAMPLE_BOARD = () => [1, 2, 3].map(i => ({
+  uid: 'prev' + i, name: SA.t('st.smp_name' + i), city: '', score: 40 - i * 9
+}));
+const SAMPLE_TEAMS = () => ({
+  a: { name: SA.t('def.group_n', { x: 1 }), colour: SA.sess.TEAM_COLOURS[0], score: 30, order: 0 },
+  b: { name: SA.t('def.group_n', { x: 2 }), colour: SA.sess.TEAM_COLOURS[1], score: 20, order: 1 }
+});
+
+function fitPreview() {
+  const frame = $('prev-frame'), stage = $('prev-stage');
+  if (!frame || !stage) return;
+  /* The stage is built at the true window width because the projector's
+     own CSS sizes everything in vw, which is measured against the window
+     whatever we do to the box. Building it at that width and then
+     scaling it down by exactly the same ratio keeps every proportion
+     right — a stage of any other width would render text for the wrong
+     screen and then shrink it by the wrong amount. */
+  const w = window.innerWidth || 1280;
+  const h = Math.round(w * 9 / 16);
+  const scale = frame.clientWidth / w;
+  if (!frame.clientWidth) return;                 // laid out but not measured yet
+  stage.style.width = w + 'px';
+  stage.style.height = h + 'px';
+  stage.style.transform = 'scale(' + scale + ')';
+  frame.style.height = Math.round(h * scale) + 'px';
+}
+
+/* A window resize is not the only thing that changes the frame's width —
+   opening the side panel or switching tabs does too — so watch the box
+   itself rather than the window. */
+let prevRO = null;
+function watchPreview() {
+  const frame = $('prev-frame');
+  if (!frame || typeof ResizeObserver !== 'function') return;
+  if (prevRO) prevRO.disconnect();
+  prevRO = new ResizeObserver(() => fitPreview());
+  prevRO.observe(frame);
+}
+window.addEventListener('resize', fitPreview);
+
+/* ─── rounds ─── */
+function paneRounds(box) {
+  const rounds = SA.game.roundsOf(G);
+  box.innerHTML = `
+    <div class="col" style="gap:14px">
+      <div class="card col" style="gap:10px">
+        <div class="spread"><label class="f" style="margin:0">${SA.t('st.tab_rounds')}</label>
+          <button class="btn sm p" id="add-rnd">+ ${SA.esc(SA.t('st.add_round'))}</button></div>
+        <div class="col" style="gap:6px">
+          ${rounds.length ? rounds.map((r, i) => {
+            const m = SA.types.get(r.type);
+            return `<div class="rnd ${r.id === RID ? 'on' : ''}" data-r="${r.id}">
+              <span class="pill" style="min-width:28px;justify-content:center">${i + 1}</span>
+              <span style="font-size:17px">${m ? m.icon : '•'}</span>
+              <span class="grow"><b>${SA.esc(r.title)}</b>
+                <span class="sm mut" style="display:block">${SA.esc(SA.types.name(r.type))} ·
+                  ${SA.game.itemsOf(G, r.id).length} ${SA.esc(SA.t('items'))}</span></span>
+              <button class="btn sm ghost" data-up="${r.id}" ${i === 0 ? 'disabled' : ''}>▲</button>
+              <button class="btn sm ghost" data-down="${r.id}" ${i === rounds.length - 1 ? 'disabled' : ''}>▼</button>
+              <button class="btn sm ghost" data-del-r="${r.id}">🗑</button>
+            </div>`;
+          }).join('') : `<div class="mut sm">${SA.esc(SA.t('st.no_rounds'))}</div>`}
+        </div>
+      </div>
+
+      ${RID ? `<div class="card col" style="gap:12px" id="rnd-cfg"></div>` : ''}
+    </div>`;
+
+  box.querySelectorAll('[data-r]').forEach(el => el.onclick = e => {
+    if (e.target.closest('button')) return;
+    RID = el.dataset.r; IID = null; render();
+  });
+
+  $('add-rnd').onclick = () => {
+    const el = document.createElement('div');
+    el.className = 'ovl';
+    el.innerHTML = `<div class="box card col" style="gap:13px">
+        <h3 style="font-size:18px">${SA.esc(SA.t('st.new_round'))}</h3>
+        <div><label class="f">${SA.t('st.name')}</label>
+          <input type="text" id="nr-t" placeholder="${SA.esc(SA.t('def.round_n', { x: rounds.length + 1 }))}"></div>
+        <div><label class="f">${SA.t('st.round_type')}</label>
+          <div class="col" style="gap:7px">
+            ${SA.types.list().map(t => `
+              <label class="chk sub" style="align-items:flex-start">
+                <input type="radio" name="nrt" value="${t.key}" ${t.key === G.info.type ? 'checked' : ''} style="margin-top:3px">
+                <span><b>${t.icon} ${SA.esc(SA.types.name(t.key))}</b>
+                <span class="sm mut" style="display:block">${SA.esc(SA.types.blurb(t.key))}</span></span></label>`).join('')}
+          </div></div>
+        <div class="row" style="justify-content:flex-end;gap:8px">
+          <button class="btn ghost" data-no>${SA.esc(SA.t('cancel'))}</button>
+          <button class="btn p" data-yes>${SA.esc(SA.t('add'))}</button></div>
+      </div>`;
+    document.body.appendChild(el);
+    el.querySelector('[data-no]').onclick = () => el.remove();
+    el.onclick = e => { if (e.target === el) el.remove(); };
+    el.querySelector('[data-yes]').onclick = () => {
+      const type = el.querySelector('[name="nrt"]:checked').value;
+      const title = el.querySelector('#nr-t').value.trim() || SA.t('def.round_n', { x: rounds.length + 1 });
+      const t = SA.types.get(type);
+      const id = 'r' + SA.uid4();
+      G.rounds = G.rounds || {};
+      G.rounds[id] = { order: rounds.length, type, title, config: (t.defaults && t.defaults()) || {} };
+      RID = id; IID = null; el.remove(); touch(); render();
+    };
+  };
+
+  box.querySelectorAll('[data-up],[data-down]').forEach(b => b.onclick = () => {
+    const id = b.dataset.up || b.dataset.down;
+    const dir = b.dataset.up ? -1 : 1;
+    const i = rounds.findIndex(r => r.id === id), j = i + dir;
+    if (j < 0 || j >= rounds.length) return;
+    G.rounds[rounds[i].id].order = j;
+    G.rounds[rounds[j].id].order = i;
+    touch(); render();
+  });
+  box.querySelectorAll('[data-del-r]').forEach(b => b.onclick = async () => {
+    const id = b.dataset.delR;
+    const n = SA.game.itemsOf(G, id).length;
+    if (!await SA.ui.confirm(SA.t('st.del_round'),
+        n ? SA.t('st.del_round_n', { x: n }) : SA.t('st.del_round_0'), SA.t('delete'))) return;
+    delete G.rounds[id];
+    if (G.content) delete G.content[id];
+    if (RID === id) RID = (SA.game.roundsOf(G)[0] || {}).id || null;
+    touch(); render();
+  });
+
+  if (RID && G.rounds[RID]) {
+    const r = G.rounds[RID];
+    const cfg = $('rnd-cfg');
+    cfg.innerHTML = `
+      <div class="spread"><label class="f" style="margin:0">${SA.t('st.round_set')}</label>
+        <span class="pill p">${SA.esc(SA.types.name(r.type))}</span></div>
+      <div><label class="f">${SA.t('st.round_name')}</label>
+        <input type="text" id="rt" value="${SA.esc(r.title)}"></div>
+      <div id="rtype-cfg"></div>`;
+    $('rt').oninput = e => { r.title = e.target.value; touch(); };
+    r.config = r.config || {};
+    SA.types.call(r.type, 'configForm', $('rtype-cfg'), Object.assign({ id: RID }, r), {
+      change: () => { G.rounds[RID].config = r.config; touch(); },
+      /* for settings that reveal other settings — switching a jumble to
+         typed answers has to bring the typing options into view now, not
+         after a reload */
+      redraw: () => { G.rounds[RID].config = r.config; touch(); render(); },
+      itemCount: () => SA.game.itemsOf(G, RID).length,
+      /* lets a type drop a whole pack of ready-made content into its round */
+      addItems: items => {
+        G.content = G.content || {};
+        G.content[RID] = G.content[RID] || {};
+        let n = SA.game.itemsOf(G, RID).length;
+        (items || []).forEach(it => {
+          G.content[RID]['i' + SA.uid4()] = Object.assign({}, it, { order: n++ });
+        });
+        touch(); render();
+      }
+    });
+  }
+}
+
+/* ─── content ─── */
+function paneContent(box) {
+  const rounds = SA.game.roundsOf(G);
+  if (!rounds.length) {
+    box.innerHTML = `<div class="card tc mut" style="padding:40px">${SA.t('st.first_round')}</div>`;
+    return;
+  }
+  if (!RID || !G.rounds[RID]) RID = rounds[0].id;
+  const r = Object.assign({ id: RID }, G.rounds[RID]);
+  const items = SA.game.itemsOf(G, RID);
+
+  box.innerHTML = `
+    <div class="col" style="gap:14px">
+      <div class="card row wrap-r" style="gap:9px">
+        <label class="f" style="margin:0;align-self:center">${SA.t('host.round')}</label>
+        <select id="r-pick" style="max-width:280px">
+          ${rounds.map(x => `<option value="${x.id}" ${x.id === RID ? 'selected' : ''}>
+            ${SA.esc(x.title)} (${SA.game.itemsOf(G, x.id).length})</option>`).join('')}
+        </select>
+        <span class="grow"></span>
+        <button class="btn sm p" id="add-it">+ ${SA.esc(SA.t('st.new_item'))}</button>
+        <button class="btn sm ghost" id="bulk">📝 ${SA.esc(SA.t('st.bulk'))}</button>
+      </div>
+
+      <div class="grid" style="grid-template-columns:minmax(0,300px) minmax(0,1fr);gap:14px;align-items:start">
+        <div class="card tight col" style="gap:9px">
+          <div class="xs mut">${items.length} ${SA.esc(SA.t('items'))}</div>
+          <div class="ilist" id="ilist">
+            ${items.length ? items.map((it, i) => `
+              <div class="iitem ${it.id === IID ? 'on' : ''}" data-i="${it.id}">
+                <span class="n">${i + 1}</span>
+                <span class="s">${SA.esc(String(SA.types.call(r.type, 'itemSummary', it) || '—'))}</span>
+              </div>`).join('') : `<div class="mut sm">${SA.esc(SA.t('st.empty_add'))}</div>`}
+          </div>
+        </div>
+
+        <div class="card col" style="gap:12px" id="ibox">
+          ${IID ? '' : `<div class="mut tc" style="padding:40px">${SA.esc(SA.t('st.pick_item'))}</div>`}
+        </div>
+      </div>
+    </div>`;
+
+  $('r-pick').onchange = e => { RID = e.target.value; IID = null; render(); };
+  box.querySelectorAll('[data-i]').forEach(el => el.onclick = () => { IID = el.dataset.i; paneContent(box); });
+
+  $('add-it').onclick = () => {
+    const t = SA.types.get(r.type);
+    const it = (t.newItem && t.newItem()) || { order: Date.now() };
+    it.order = items.length;
+    const id = 'i' + SA.uid4();
+    G.content = G.content || {}; G.content[RID] = G.content[RID] || {};
+    G.content[RID][id] = it;
+    IID = id; touch(); paneContent(box);
+  };
+
+  $('bulk').onclick = () => bulkAdd(r);
+
+  if (IID && G.content && G.content[RID] && G.content[RID][IID]) {
+    const item = Object.assign({ id: IID }, G.content[RID][IID]);
+    const ib = $('ibox');
+    ib.innerHTML = `
+      <div class="spread">
+        <span class="pill p">${SA.esc(SA.t('st.item_n', { x: items.findIndex(x => x.id === IID) + 1 }))}</span>
+        <div class="row" style="gap:6px">
+          <button class="btn sm ghost" id="dup-it">⧉ ${SA.esc(SA.t('st.duplicate'))}</button>
+          <button class="btn sm ghost" id="del-it">🗑 ${SA.esc(SA.t('delete'))}</button>
+        </div>
+      </div>
+      <div id="iedit"></div>`;
+
+    SA.types.call(r.type, 'editItem', $('iedit'), item, {
+      round: r,
+      change: () => {
+        const { id, ...rest } = item;
+        G.content[RID][IID] = rest;
+        touch();
+        /* keep the left list in step without stealing focus from a field */
+        const row = box.querySelector(`[data-i="${IID}"] .s`);
+        if (row) row.textContent = String(SA.types.call(r.type, 'itemSummary', item) || '—');
+      },
+      redraw: () => { const { id, ...rest } = item; G.content[RID][IID] = rest; touch(); paneContent(box); }
+    });
+
+    $('dup-it').onclick = () => {
+      const { id, ...rest } = item;
+      const nid = 'i' + SA.uid4();
+      G.content[RID][nid] = Object.assign({}, rest, { order: items.length });
+      IID = nid; touch(); paneContent(box);
+    };
+    $('del-it').onclick = async () => {
+      if (!await SA.ui.confirm(SA.t('st.del_item'), '', SA.t('delete'))) return;
+      delete G.content[RID][IID]; IID = null; touch(); paneContent(box);
+    };
+  }
+}
+
+/* Paste many questions at once — the difference between a 20-minute
+   evening and a three-hour one when loading a real question bank. */
+function bulkAdd(r) {
+  const ex = {
+    quiz:   'question | option A | option B | option C | option D | correct(A-D) | explanation',
+    jumble: 'answer | hint',
+    buzzer: 'question | first | second | third | fourth',
+    tambola:'number | the fact for that number | level (1,2,3 — optional)',
+    custom: 'title | main text'
+  }[r.type] || 'one item per line';
+
+  const el = document.createElement('div');
+  el.className = 'ovl';
+  el.innerHTML = `
+    <div class="box wide card col" style="gap:13px">
+      <h3 style="font-size:18px">${SA.esc(SA.t('st.bulk_title'))}</h3>
+      <div class="sub sm mut">${SA.t('st.bulk_note')}<br>
+        <code style="color:var(--primary)">${SA.esc(ex)}</code></div>
+      <textarea id="blk" rows="12" placeholder="${SA.esc(ex)}" style="font-family:monospace;font-size:13px"></textarea>
+      <div class="row" style="justify-content:flex-end;gap:8px">
+        <button class="btn ghost" data-no>${SA.esc(SA.t('cancel'))}</button>
+        <button class="btn p" data-yes>${SA.esc(SA.t('add'))}</button>
+      </div>
+    </div>`;
+  document.body.appendChild(el);
+  el.querySelector('[data-no]').onclick = () => el.remove();
+  el.onclick = e => { if (e.target === el) el.remove(); };
+  el.querySelector('[data-yes]').onclick = () => {
+    const lines = el.querySelector('#blk').value.split('\n').map(s => s.trim()).filter(Boolean);
+    let n = SA.game.itemsOf(G, RID).length, added = 0;
+    G.content = G.content || {}; G.content[RID] = G.content[RID] || {};
+    lines.forEach(line => {
+      const c = line.split('|').map(s => s.trim());
+      let it = null;
+      if (r.type === 'quiz' && c.length >= 6) {
+        const ci = 'ABCDEF'.indexOf((c[5] || 'A').toUpperCase());
+        it = { q: c[0], opts: c.slice(1, 5), correct: ci < 0 ? 0 : ci, explain: c[6] || '', fifty: [] };
+      } else if (r.type === 'jumble' && c[0]) {
+        it = { answer: c[0], hint: c[1] || '', mode: '' };
+      } else if (r.type === 'buzzer' && c.length >= 2) {
+        it = { q: c[0], items: c.slice(1), mode: '' };
+      } else if (r.type === 'tambola' && c.length >= 2) {
+        /* a trailing 1–5 is read as the level; anything else stays part of
+           the fact, so a fact that happens to end in a number is safe */
+        const maxL = Math.max(1, Number((r.config || {}).levelCount) || 3);
+        let level = 1, rest = c.slice(1);
+        const last = rest[rest.length - 1];
+        if (rest.length > 1 && /^[1-9]$/.test(last) && Number(last) <= maxL) {
+          level = Number(rest.pop());
+        }
+        it = { n: Number(c[0]) || (n + 1), text: rest.join(' | '), level };
+      } else if (r.type === 'custom' && c[0]) {
+        it = { title: c[0], text: c[1] || '', opts: ['', '', '', ''], correctSet: [], timer: '', points: '' };
+      }
+      if (!it) return;
+      it.order = n++;
+      G.content[RID]['i' + SA.uid4()] = it;
+      added++;
+    });
+    el.remove();
+    touch();
+    SA.toast(SA.t('st.bulk_added', { x: added }) +
+      (added < lines.length ? ' ' + SA.t('st.bulk_skip', { x: lines.length - added }) : ''));
+    render();
+  };
+}
+
+/* ─── backup ─── */
+function paneBackup(box) {
+  const rounds = SA.game.roundsOf(G);
+  box.innerHTML = `
+    <div class="col" style="gap:14px">
+      <div class="card col" style="gap:12px">
+        <label class="f">${SA.t('st.backup')}</label>
+        <p class="sm mut">${SA.t('st.backup_note')}</p>
+        <div class="row wrap-r" style="gap:8px">
+          <button class="btn p" id="dl">⬇ ${SA.esc(SA.t('st.download'))}</button>
+          <button class="btn" id="dup-g">⧉ ${SA.esc(SA.t('st.dup_game'))}</button>
+        </div>
+      </div>
+
+      <div class="card col" style="gap:10px">
+        <label class="f">${SA.t('st.whats_in')}</label>
+        <div class="grid g3">
+          ${rounds.map(r => `<div class="sub tc">
+            <div style="font:800 24px/1 var(--fd);color:var(--primary)">${SA.game.itemsOf(G, r.id).length}</div>
+            <div class="sm mut" style="margin-top:4px">${SA.esc(r.title)}</div></div>`).join('')
+            || `<div class="mut sm">${SA.esc(SA.t('st.no_rounds'))}</div>`}
+        </div>
+      </div>
+
+      <div class="card col" style="gap:10px;border-color:var(--bad)">
+        <label class="f" style="color:var(--bad)">${SA.t('st.danger')}</label>
+        <button class="btn bad" id="del-g" style="align-self:flex-start">🗑 ${SA.esc(SA.t('st.del_game'))}</button>
+      </div>
+    </div>`;
+
+  $('dl').onclick = () => { flush(); SA.game.download(G, GID); };
+  $('dup-g').onclick = async () => {
+    await flush();
+    const id = await SA.game.duplicate(GID);
+    SA.toast(SA.t('st.dup_made')); open(id);
+  };
+  $('del-g').onclick = async () => {
+    if (!await SA.ui.confirm(SA.t('st.del_game_q'),
+      SA.t('st.del_game_b', { x: SA.esc(G.info.title) }), SA.t('st.del_forever'))) return;
+    await SA.game.remove(GID);
+    GID = null; G = null;
+    location.href = 'studio.html';
+  };
+}
+</script>
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

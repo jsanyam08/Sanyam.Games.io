@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Kaun Banega Siddhatma - Play Live</title>
+    
+    <!-- ADD FIREBASE LIBRARIES -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Mukta:wght@400;600;800&family=Poppins:wght@400;600;800&display=swap');
+
+        :root {
+            /* 🌙 DARK THEME */
+            --bg-grad: radial-gradient(circle at top, #2b1140 0%, #11051c 100%);
+            --text-main: #f9f4ea; --text-muted: #d0c5b3;
+            --header-bg: linear-gradient(180deg, #371752 0%, #1a082b 100%);
+            --header-border: #a586d1; --border-primary: #e6d8b8;
+            --btn-bg: #32164a; --btn-text: #f9f4ea;
+            --locked-bg: #e6d8b8; --locked-text: #11051c;
+            --accent: #c5a3ff;
+            --success-bg: rgba(230, 216, 184, 0.15); --shadow-glow: rgba(230, 216, 184, 0.3);
+        }
+
+        [data-theme="light"] {
+            /* ☀️ LIGHT THEME */
+            --bg-grad: radial-gradient(circle at top, #ffffff 0%, #f0e6d2 100%);
+            --text-main: #2b1140; --text-muted: #5e3b7a;
+            --header-bg: linear-gradient(180deg, #f0e6d2 0%, #e6d8b8 100%);
+            --header-border: #4e2270; --border-primary: #4e2270;
+            --btn-bg: #fdfbfa; --btn-text: #2b1140;
+            --locked-bg: #4e2270; --locked-text: #f9f4ea;
+            --accent: #7434a6;
+            --success-bg: rgba(78, 34, 112, 0.1); --shadow-glow: rgba(78, 34, 112, 0.3);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Mukta', 'Poppins', sans-serif; -webkit-tap-highlight-color: transparent; user-select: none; }
+        body { background: var(--bg-grad); color: var(--text-main); height: 100dvh; width: 100vw; display: flex; flex-direction: column; overflow: hidden; transition: background 0.4s ease, color 0.4s ease; }
+        button, .m-opt-btn, .poll-btn, .aud-opt-btn { touch-action: manipulation; }
+
+        .app-header { background: var(--header-bg); border-bottom: 2px solid var(--header-border); padding: 2vh 5vw; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 15px rgba(0,0,0,0.2); z-index: 10; flex-shrink: 0; }
+        .header-text h1 { font-size: clamp(1.2rem, 3vh, 1.5rem); color: var(--accent); font-weight: 800; }
+        .header-text p { font-size: clamp(0.75rem, 1.5vh, 0.85rem); color: var(--text-muted); font-weight: 600;}
+        .theme-btn { background: transparent; border: 2px solid var(--accent); border-radius: 50%; width: clamp(35px, 8vw, 45px); height: clamp(35px, 8vw, 45px); font-size: 1.2rem; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: 0.3s; box-shadow: 0 0 10px var(--shadow-glow); }
+
+        .screen { display: none; flex: 1; flex-direction: column; align-items: center; justify-content: space-evenly; padding: 2vh 5vw; width: 100%; height: 100%; overflow: hidden; }
+        .screen.active { display: flex; }
+
+        .waiting-text { font-size: clamp(1.5rem, 4vh, 2rem); font-weight: 800; text-align: center; color: var(--accent); }
+        .waiting-sub { font-size: clamp(1rem, 2vh, 1.2rem); color: var(--text-muted); text-align: center; font-weight: 600;}
+
+        .timer-circle { width: clamp(60px, 12vh, 80px); height: clamp(60px, 12vh, 80px); border-radius: 50%; border: 4px solid var(--accent); display: flex; align-items: center; justify-content: center; font-size: clamp(1.8rem, 4vh, 2.5rem); font-weight: 800; background: var(--btn-bg); box-shadow: 0 0 20px var(--shadow-glow); color: var(--text-main); flex-shrink: 0; }
+        .screen-title { font-size: clamp(1.1rem, 2.5vh, 1.3rem); text-align: center; font-weight: 600; line-height: 1.2; color: var(--text-main);}
+        .screen-title span { font-size: clamp(0.85rem, 1.8vh, 1rem); color: var(--accent); font-weight: 600; display: block; }
+
+        .action-container { width: 100%; height: clamp(50px, 8vh, 65px); flex-shrink: 0; position: relative; }
+        .action-row { display: flex; gap: 10px; width: 100%; height: 100%; }
+        .action-btn { flex: 1; border-radius: 12px; border: 2px solid var(--border-primary); font-size: clamp(1rem, 2.2vh, 1.2rem); font-weight: 800; cursor: pointer; transition: 0.2s; display: flex; align-items: center; justify-content: center;}
+        .btn-clear { background: transparent; color: var(--text-main); }
+        .btn-submit { background: transparent; color: var(--text-muted); border-color: var(--text-muted); opacity: 0.5; pointer-events: none; }
+        .btn-submit.ready { background: var(--locked-bg); color: var(--locked-text); border-color: var(--locked-bg); opacity: 1; pointer-events: auto; box-shadow: 0 0 15px var(--shadow-glow); }
+        .submitted-msg { display: none; background: var(--success-bg); border: 2px solid var(--accent); color: var(--text-main); border-radius: 12px; font-weight: bold; font-size: clamp(1.1rem, 2.2vh, 1.3rem); width: 100%; height: 100%; align-items: center; justify-content: center; position: absolute; top: 0; left: 0; }
+
+        .fff-order-display { width: 100%; height: clamp(45px, 7vh, 60px); background: transparent; border: 2px dashed var(--border-primary); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: clamp(1.2rem, 3vh, 1.5rem); font-weight: bold; color: var(--accent); letter-spacing: 5px; flex-shrink: 0; }
+        .mobile-options-grid { width: 100%; display: flex; flex-direction: column; gap: clamp(8px, 1.5vh, 12px); flex-shrink: 1;}
+        .m-opt-btn { background: var(--btn-bg); border: 2px solid var(--border-primary); border-radius: 12px; padding: clamp(10px, 2vh, 15px) 20px; font-size: clamp(1rem, 2.2vh, 1.2rem); font-weight: 600; color: var(--btn-text); text-align: left; transition: 0.1s; display: flex; align-items: center; }
+        .m-opt-btn.tapped { background: var(--locked-bg); border-color: var(--locked-bg); color: var(--locked-text); box-shadow: inset 0 0 10px rgba(0,0,0,0.2);}
+        .m-opt-lbl { color: var(--accent); font-weight: 800; margin-right: 15px; font-size: clamp(1.1rem, 2.5vh, 1.4rem); transition: 0.1s;}
+        .m-opt-btn.tapped .m-opt-lbl { color: var(--locked-text); }
+
+        .poll-grid { display: grid; grid-template-columns: 1fr 1fr; gap: clamp(10px, 2vh, 15px); width: 100%; flex: 1; max-height: 300px; margin: 10px 0;}
+        .poll-btn { background: var(--btn-bg); border: 2px solid var(--border-primary); border-radius: 20px; display: flex; align-items: center; justify-content: center; font-size: clamp(2.5rem, 6vh, 3.5rem); font-weight: 800; color: var(--accent); transition: 0.2s; }
+        .poll-btn.selected { background: var(--success-bg); border-color: var(--accent); box-shadow: 0 0 15px var(--shadow-glow);}
+        .poll-btn.locked { background: var(--locked-bg); border-color: var(--locked-bg); color: var(--locked-text); pointer-events: none;}
+        .poll-btn.disabled { opacity: 0.3; pointer-events: none; }
+
+        .aud-q-box { width: 100%; background: var(--btn-bg); border: 2px solid var(--accent); border-radius: 12px; padding: clamp(10px, 2vh, 15px); font-size: clamp(1.1rem, 2.2vh, 1.3rem); font-weight: 600; text-align: center; box-shadow: 0 0 10px var(--shadow-glow); flex-shrink: 0; }
+        
+        /* Connection Dot */
+        .conn-dot { display: inline-block; width: 8px; height: 8px; background: red; border-radius: 50%; margin-left: 5px; box-shadow: 0 0 5px red;}
+        .conn-dot.active { background: #00e676; box-shadow: 0 0 5px #00e676; }
+    </style>
+</head>
+<body>
+
+    <div class="app-header">
+        <div class="header-text">
+            <h1>सिद्धात्मा Live <span class="conn-dot" id="conn-dot"></span></h1>
+            <p>Audience Play</p>
+        </div>
+        <button class="theme-btn" id="theme-toggle" onclick="toggleTheme()">☀️</button>
+    </div>
+
+    <!-- 1. WAITING SCREEN -->
+    <div class="screen active" id="screen-waiting">
+        <div class="waiting-text">कृपया मुख्य स्क्रीन पर ध्यान दें</div>
+        <div class="waiting-sub">Please look at the projector screen.<br>Game is currently in progress.</div>
+    </div>
+
+    <!-- 2. FFF SCREEN -->
+    <div class="screen" id="screen-fff">
+        <div class="timer-circle" id="fff-timer">20</div>
+        <div class="screen-title">क्रम में लगाएँ<span>Tap options in the correct order</span></div>
+        <div class="fff-order-display" id="fff-display"></div>
+        <div class="mobile-options-grid">
+            <div class="m-opt-btn" onclick="tapFFF('A', this)"><span class="m-opt-lbl">A</span> तीसरा काल</div>
+            <div class="m-opt-btn" onclick="tapFFF('B', this)"><span class="m-opt-lbl">B</span> पहला काल</div>
+            <div class="m-opt-btn" onclick="tapFFF('C', this)"><span class="m-opt-lbl">C</span> चौथा काल</div>
+            <div class="m-opt-btn" onclick="tapFFF('D', this)"><span class="m-opt-lbl">D</span> दूसरा काल</div>
+        </div>
+        <div class="action-container">
+            <div class="action-row" id="fff-actions">
+                <button class="action-btn btn-clear" onclick="clearFFF()">Clear All</button>
+                <button class="action-btn btn-submit" id="fff-submit-btn" onclick="submitFFF()">Submit</button>
+            </div>
+            <div class="submitted-msg" id="fff-msg">Locked! (सुरक्षित)</div>
+        </div>
+    </div>
+
+    <!-- 3. POLL SCREEN -->
+    <div class="screen" id="screen-poll">
+        <div class="timer-circle" id="poll-timer">30</div>
+        <div class="screen-title">Audience Poll<span>Select your vote, then press Submit</span></div>
+        <div class="poll-grid">
+            <div class="poll-btn" onclick="selectPoll('A', this)">A</div><div class="poll-btn" onclick="selectPoll('B', this)">B</div>
+            <div class="poll-btn" onclick="selectPoll('C', this)">C</div><div class="poll-btn" onclick="selectPoll('D', this)">D</div>
+        </div>
+        <div class="action-container">
+            <div class="action-row" id="poll-actions">
+                <button class="action-btn btn-clear" onclick="clearPoll()">Clear</button>
+                <button class="action-btn btn-submit" id="poll-submit-btn" onclick="submitPoll()">Submit</button>
+            </div>
+            <div class="submitted-msg" id="poll-msg">Vote Locked!</div>
+        </div>
+    </div>
+
+    <!-- 4. AUDIENCE Q SCREEN -->
+    <div class="screen" id="screen-audq">
+        <div class="timer-circle" id="audq-timer">15</div>
+        <div class="aud-q-box">वर्तमान चौबीसी के प्रथम तीर्थंकर कौन हैं?</div>
+        <div class="mobile-options-grid">
+            <div class="m-opt-btn" onclick="selectAudQ('A', this)"><span class="m-opt-lbl">A</span> भगवान महावीर</div>
+            <div class="m-opt-btn" onclick="selectAudQ('B', this)"><span class="m-opt-lbl">B</span> भगवान ऋषभदेव</div>
+            <div class="m-opt-btn" onclick="selectAudQ('C', this)"><span class="m-opt-lbl">C</span> भगवान पार्श्वनाथ</div>
+            <div class="m-opt-btn" onclick="selectAudQ('D', this)"><span class="m-opt-lbl">D</span> भगवान शान्तिनाथ</div>
+        </div>
+        <div class="action-container">
+            <div class="action-row" id="audq-actions">
+                <button class="action-btn btn-clear" onclick="clearAudQ()">Clear</button>
+                <button class="action-btn btn-submit" id="audq-submit-btn" onclick="submitAudQ()">Submit</button>
+            </div>
+            <div class="submitted-msg" id="audq-msg">Answer Locked!</div>
+        </div>
+    </div>
+
+    <script>
+        // --- FIREBASE CONNECTION ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyBvFw7TNlflcBbms-K4sk_jrqgdzYYJKok",
+            authDomain: "kounbanegasiddhatma.firebaseapp.com",
+            databaseURL: "https://kounbanegasiddhatma-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "kounbanegasiddhatma",
+            storageBucket: "kounbanegasiddhatma.firebasestorage.app",
+            messagingSenderId: "53011686572",
+            appId: "1:53011686572:web:f9b02eb2aed988c9ed6b09"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+        
+        // Generate a random User ID for this audience member
+        const userId = "user_" + Math.floor(Math.random() * 10000000);
+
+        // Visual Connection Status
+        db.ref('.info/connected').on('value', function(snap) {
+            if (snap.val() === true) document.getElementById('conn-dot').classList.add('active');
+            else document.getElementById('conn-dot').classList.remove('active');
+        });
+
+        // --- THEME & UI LOGIC ---
+        function toggleTheme() {
+            const body = document.documentElement;
+            const btn = document.getElementById('theme-toggle');
+            if (body.getAttribute('data-theme') === 'light') { body.removeAttribute('data-theme'); btn.innerText = '☀️'; } 
+            else { body.setAttribute('data-theme', 'light'); btn.innerText = '🌙'; }
+        }
+
+        function switchScreen(screenId) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(screenId).classList.add('active');
+            
+            clearFFF(); document.getElementById('fff-msg').style.display = 'none'; document.getElementById('fff-actions').style.display = 'flex';
+            clearPoll(); document.getElementById('poll-msg').style.display = 'none'; document.getElementById('poll-actions').style.display = 'flex';
+            clearAudQ(); document.getElementById('audq-msg').style.display = 'none'; document.getElementById('audq-actions').style.display = 'flex';
+        }
+
+        // --- CLOUD COMMAND LISTENER ---
+        let isInitialLoad = true;
+        db.ref('host_commands').on('value', (snapshot) => {
+            const data = snapshot.val();
+            if (!data) return;
+            if (isInitialLoad) { isInitialLoad = false; return; }
+
+            // Handle Screen Switches
+            if (data.type === 'screen' || (data.type === 'action' && data.value === 'reveal_options')) {
+                if (data.value === 'fff_mode') switchScreen('screen-fff');
+                else if (data.value === 'audience_q') switchScreen('screen-audq');
+                else switchScreen('screen-waiting'); // For main_game or reveal_options
+            }
+
+            if (data.type === 'lifeline' && data.value === 'poll') {
+                switchScreen('screen-poll');
+            }
+
+            // Handle Cloud Timers
+            if (data.type === 'timer') {
+                if (data.value === 'start_poll') startCountdown('poll-timer', 30, submitPoll);
+                // Can add more timers here if needed later
+            }
+        });
+
+        // --- COUNTDOWN TIMER LOGIC ---
+        let activeTimerInterval = null;
+        function startCountdown(elementId, seconds, autoSubmitFunction) {
+            clearInterval(activeTimerInterval); 
+            const el = document.getElementById(elementId);
+            if(!el) return;
+            
+            let timeLeft = seconds;
+            el.innerText = timeLeft; 
+            
+            activeTimerInterval = setInterval(() => {
+                timeLeft--;
+                if(timeLeft <= 0) {
+                    clearInterval(activeTimerInterval);
+                    el.innerText = "0";
+                    // If time runs out, automatically trigger the submit function!
+                    if (autoSubmitFunction) autoSubmitFunction();
+                } else {
+                    el.innerText = timeLeft;
+                }
+            }, 1000);
+        }
+
+        // --- FFF LOGIC ---
+        let fffOrder = [];
+        const fffDisplay = document.getElementById('fff-display');
+        const fffSubmitBtn = document.getElementById('fff-submit-btn');
+
+        function tapFFF(letter, element) {
+            if(fffSubmitBtn.classList.contains('submitted')) return; 
+            if (element.classList.contains('tapped')) { fffOrder = fffOrder.filter(item => item !== letter); element.classList.remove('tapped'); } 
+            else if (fffOrder.length < 4) { fffOrder.push(letter); element.classList.add('tapped'); }
+            updateFFFDisplay();
+        }
+        function updateFFFDisplay() { fffDisplay.innerText = fffOrder.join(' - '); if(fffOrder.length === 4) fffSubmitBtn.classList.add('ready'); else fffSubmitBtn.classList.remove('ready'); }
+        function clearFFF() { fffOrder = []; updateFFFDisplay(); document.querySelectorAll('#screen-fff .m-opt-btn').forEach(b => b.classList.remove('tapped', 'disabled')); fffSubmitBtn.classList.remove('submitted'); }
+        function submitFFF() {
+            if(fffOrder.length === 4) {
+                document.getElementById('fff-actions').style.display = 'none'; document.getElementById('fff-msg').style.display = 'flex'; fffSubmitBtn.classList.add('submitted');
+                // Push to Cloud
+                db.ref('audience_responses/fff/' + userId).set({ answer: fffOrder.join(''), timestamp: firebase.database.ServerValue.TIMESTAMP });
+            }
+        }
+
+        // --- POLL LOGIC ---
+        let selectedPollOption = null;
+        const pollSubmitBtn = document.getElementById('poll-submit-btn');
+
+        function selectPoll(letter, element) {
+            if(pollSubmitBtn.classList.contains('submitted')) return; 
+            selectedPollOption = letter;
+            document.querySelectorAll('.poll-btn').forEach(b => b.classList.remove('selected'));
+            element.classList.add('selected'); pollSubmitBtn.classList.add('ready');
+        }
+        function clearPoll() { selectedPollOption = null; document.querySelectorAll('.poll-btn').forEach(b => b.classList.remove('selected', 'locked', 'disabled')); pollSubmitBtn.classList.remove('ready', 'submitted'); }
+        function submitPoll() {
+            if(selectedPollOption && !pollSubmitBtn.classList.contains('submitted')) {
+                pollSubmitBtn.classList.add('submitted');
+                document.getElementById('poll-actions').style.display = 'none'; document.getElementById('poll-msg').style.display = 'flex';
+                document.querySelectorAll('.poll-btn').forEach(b => {
+                    b.classList.remove('selected');
+                    if(b.innerText === selectedPollOption) b.classList.add('locked'); else b.classList.add('disabled');
+                });
+                // Push to Cloud
+                db.ref('audience_responses/poll/' + userId).set({ answer: selectedPollOption, timestamp: firebase.database.ServerValue.TIMESTAMP });
+            }
+        }
+
+        // --- AUD Q LOGIC ---
+        let selectedAudQOption = null;
+        const audqSubmitBtn = document.getElementById('audq-submit-btn');
+
+        function selectAudQ(letter, element) {
+            if(audqSubmitBtn.classList.contains('submitted')) return;
+            selectedAudQOption = letter;
+            document.querySelectorAll('#screen-audq .m-opt-btn').forEach(b => b.classList.remove('tapped'));
+            element.classList.add('tapped'); audqSubmitBtn.classList.add('ready');
+        }
+        function clearAudQ() { selectedAudQOption = null; document.querySelectorAll('#screen-audq .m-opt-btn').forEach(b => b.classList.remove('tapped', 'locked', 'disabled')); audqSubmitBtn.classList.remove('ready', 'submitted'); }
+        function submitAudQ() {
+            if(selectedAudQOption && !audqSubmitBtn.classList.contains('submitted')) {
+                audqSubmitBtn.classList.add('submitted');
+                document.getElementById('audq-actions').style.display = 'none'; document.getElementById('audq-msg').style.display = 'flex';
+                document.querySelectorAll('#screen-audq .m-opt-btn').forEach(b => { if(!b.classList.contains('tapped')) b.classList.add('disabled'); });
+                // Push to Cloud
+                db.ref('audience_responses/audq/' + userId).set({ answer: selectedAudQOption, timestamp: firebase.database.ServerValue.TIMESTAMP });
+            }
+        }
+    </script>
+</body>
+</html>

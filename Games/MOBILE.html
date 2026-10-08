@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#060d1f">
+<meta name="mobile-web-app-capable" content="yes">
+<title>कौन बनेगा सिद्धात्मा — दर्शक</title>
+
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Mukta:wght@400;600;700;800&family=Poppins:wght@700;800;900&display=swap');
+
+:root{
+  --bg:#050a16; --card:#0e1830; --card2:#0a1224; --bd:#1e2d4d;
+  --gold:#ffcf2e; --gold-dk:#8a6206;
+  --purple:#c026d3; --purple-dk:#5b0d63;
+  --green:#12c98a; --red:#f0433f; --blue:#3d6fe0;
+  --tx:#f2f6fc; --mut:#8ba0c2;
+}
+html[data-theme="light"]{
+  --bg:#f3f1e9; --card:#ffffff; --card2:#faf7ee; --bd:#ddd5bc;
+  --gold:#a8790a; --gold-dk:#d9b445;
+  --purple:#9c1fad; --purple-dk:#eccdf2;
+  --green:#0a8f62; --red:#c8302c; --blue:#2a53c0;
+  --tx:#1a1c22; --mut:#65697a;
+}
+html[data-theme="light"] .b-purple{color:#3d0745}
+html[data-theme="light"] .b-slate{background:#e7e3d4;border-color:#cfc6a8;color:#1a1c22}
+html[data-theme="light"] .b-gold{color:#221a02}
+html[data-theme="light"] #tt{background:#fffdf7;color:#1a1c22}
+html[data-theme="light"] .hd{background:linear-gradient(180deg,#fffdf6,#f6f2e6)}
+html[data-theme="light"] .opt .k{background:#efe8d2}
+html[data-theme="light"] .fitem .num{background:#efe8d2}
+html[data-theme="light"] .fitem.picked .num{color:#fff}
+html[data-theme="light"] .opt.sel{background:rgba(168,121,10,.12)}
+html[data-theme="light"] .opt.right{background:rgba(10,143,98,.13)}
+html[data-theme="light"] .opt.wrongsel{background:rgba(200,48,44,.12)}
+html[data-theme="light"] .res.win{background:rgba(10,143,98,.10)}
+html[data-theme="light"] .res.lose{background:rgba(200,48,44,.09)}
+html[data-theme="light"] .pill.open{background:rgba(10,143,98,.13)}
+html[data-theme="light"] .pill.shut{background:rgba(200,48,44,.12)}
+html[data-theme="light"] .pill.done{background:rgba(168,121,10,.14)}
+html[data-theme="light"] .thbtn{background:#fffdf6;color:#5c4104;border-color:#cfc6a8}
+*{box-sizing:border-box;margin:0;padding:0;font-family:'Mukta',sans-serif;
+  -webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{background:var(--bg);color:var(--tx);display:flex;flex-direction:column;overflow:hidden;
+  font-size:16px;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+button{border:none;border-radius:11px;padding:15px;font-size:1rem;font-weight:800;cursor:pointer;
+  color:#fff;width:100%;transition:.14s;font-family:'Mukta',sans-serif}
+button:active:not(:disabled){transform:scale(.97)}
+button:disabled{opacity:.4;cursor:not-allowed}
+input{background:var(--card2);border:1px solid var(--bd);border-radius:11px;padding:15px;
+  color:var(--tx);font-size:1.05rem;outline:none;width:100%;-webkit-text-fill-color:var(--tx)}
+input:focus{border-color:var(--gold)}
+input::placeholder{color:var(--mut);opacity:1}
+/* Chrome autofill repaints the box — force our own colours back */
+input:-webkit-autofill,input:-webkit-autofill:hover,input:-webkit-autofill:focus{
+  -webkit-text-fill-color:var(--tx);
+  -webkit-box-shadow:0 0 0 1000px var(--card2) inset;
+  caret-color:var(--tx)}
+.b-gold{background:linear-gradient(180deg,var(--gold),#c9970b);color:#1a1503}
+.b-purple{background:var(--purple-dk);border:1px solid var(--purple)}
+.b-slate{background:#1b2740;border:1px solid #2f4470}
+.b-green{background:var(--green);color:#03261a}
+
+/* HEADER */
+.hd{display:flex;justify-content:space-between;align-items:center;padding:11px 16px;
+  background:linear-gradient(180deg,#101b35,#070e1e);border-bottom:1px solid var(--bd);flex-shrink:0;gap:10px}
+.hd .ttl{font-size:.9rem;font-weight:800;color:var(--gold);letter-spacing:normal;line-height:1.5;font-family:'Baloo 2','Mukta',sans-serif}
+.hd .me{font-size:.74rem;color:var(--mut);text-align:right;line-height:1.3;white-space:nowrap}
+.hd .me b{color:var(--green);font-size:.95rem;display:block;font-family:'Poppins',sans-serif}
+
+/* SCREENS */
+.wrap{flex:1;overflow-y:auto;display:flex;flex-direction:column;padding:18px 16px 26px;gap:16px}
+.pg{display:none;flex-direction:column;gap:16px;flex:1;animation:fade .3s}
+.pg.on{display:flex}
+@keyframes fade{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+
+.hero{text-align:center;padding:22px 0 10px}
+/* Devanagari needs room above and below or the matras get clipped */
+.hero h1{font-size:2rem;font-weight:800;font-family:'Baloo 2','Mukta',sans-serif;line-height:1.6;
+  letter-spacing:normal;padding:.3em .15em;overflow:visible;
+  background:linear-gradient(180deg,#fff4c8,var(--gold) 55%,#a97d09);
+  -webkit-background-clip:text;background-clip:text;color:transparent;margin-bottom:4px}
+html[data-theme="light"] .hero h1{background:linear-gradient(180deg,#c9920f,#8a6206 60%,#5c4104);
+  -webkit-background-clip:text;background-clip:text}
+.hero p{font-size:.92rem;color:var(--mut);line-height:1.5}
+
+.card{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:18px;
+  display:flex;flex-direction:column;gap:13px}
+.card h2{font-size:1.15rem;color:var(--gold);font-weight:800}
+.card p{font-size:.95rem;color:var(--tx);opacity:.9;line-height:1.55}
+.q{font-size:1.3rem;font-weight:800;line-height:1.55;color:var(--tx);font-family:'Baloo 2','Mukta',sans-serif}
+
+/* WAIT */
+.wait{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;text-align:center}
+.wait .ic{font-size:3.4rem;animation:bob 2.4s ease-in-out infinite}
+@keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-9px)}}
+.wait h2{font-size:1.35rem;color:var(--gold);font-weight:800}
+.wait p{color:var(--mut);font-size:.95rem;line-height:1.6;max-width:300px}
+
+/* OPTIONS */
+.opts{display:flex;flex-direction:column;gap:11px}
+.opt{display:flex;align-items:center;gap:13px;padding:16px;background:var(--card2);
+  border:2px solid var(--bd);border-radius:12px;font-size:1.05rem;font-weight:700;
+  cursor:pointer;transition:.16s;text-align:left;color:var(--tx);width:100%}
+.opt .k{width:30px;height:30px;border-radius:50%;background:#1b2b4d;color:var(--gold);
+  display:flex;align-items:center;justify-content:center;font-weight:800;flex-shrink:0;font-size:.95rem}
+.opt:active{transform:scale(.98)}
+.opt.sel{border-color:var(--gold);background:rgba(255,207,46,.11)}
+.opt.sel .k{background:var(--gold);color:#1a1503}
+.opt.right{border-color:var(--green);background:rgba(18,201,138,.13)}
+.opt.right .k{background:var(--green);color:#03261a}
+.opt.wrongsel{border-color:var(--red);background:rgba(240,67,63,.13)}
+.opt.wrongsel .k{background:var(--red)}
+.opt.dim{opacity:.35}
+.opt:disabled{cursor:default}
+
+/* FFF ORDERING */
+.fitem{display:flex;align-items:center;gap:13px;padding:15px;background:var(--card2);
+  border:2px solid var(--bd);border-radius:12px;font-size:1.02rem;font-weight:700;
+  cursor:pointer;transition:.16s;text-align:left;color:var(--tx);width:100%}
+.fitem .num{width:30px;height:30px;border-radius:9px;background:#1b2b4d;color:var(--mut);
+  display:flex;align-items:center;justify-content:center;font-weight:800;flex-shrink:0;
+  font-family:'Poppins',sans-serif;transition:.16s}
+.fitem.picked{border-color:var(--purple);background:rgba(192,38,211,.12)}
+.fitem.picked .num{background:var(--purple);color:#fff}
+.fitem.correctpos{border-color:var(--green)}
+.fitem.correctpos .num{background:var(--green);color:#03261a}
+.fitem.wrongpos{border-color:var(--red)}
+.fitem.wrongpos .num{background:var(--red)}
+
+/* STATUS PILL */
+.pill{display:inline-flex;align-items:center;gap:7px;padding:7px 13px;border-radius:20px;
+  font-size:.8rem;font-weight:800;align-self:flex-start;letter-spacing:.3px}
+.pill.open{background:rgba(18,201,138,.14);color:var(--green);border:1px solid rgba(18,201,138,.4)}
+.pill.shut{background:rgba(240,67,63,.14);color:var(--red);border:1px solid rgba(240,67,63,.4)}
+.pill.done{background:rgba(255,207,46,.14);color:var(--gold);border:1px solid rgba(255,207,46,.4)}
+
+/* RESULT BANNER */
+.res{text-align:center;padding:22px;border-radius:14px;display:flex;flex-direction:column;gap:9px}
+.res.win{background:rgba(18,201,138,.11);border:2px solid var(--green)}
+.res.lose{background:rgba(240,67,63,.1);border:2px solid var(--red)}
+.res .big{font-size:2.3rem;font-weight:900;font-family:'Poppins',sans-serif}
+.res.win .big{color:var(--green)} .res.lose .big{color:var(--red)}
+.res .sm{font-size:.95rem;color:var(--tx);opacity:.92;line-height:1.5}
+
+/* LEADERBOARD */
+.lb{display:flex;flex-direction:column;gap:9px}
+.lbr{display:grid;grid-template-columns:40px 1fr auto;align-items:center;gap:12px;padding:13px 15px;
+  background:var(--card2);border:1px solid var(--bd);border-radius:11px;font-size:1rem;font-weight:700}
+.lbr .r{font-family:'Poppins',sans-serif;font-weight:800;color:var(--gold)}
+.lbr .d{color:var(--green);font-family:'Poppins',sans-serif;font-weight:800;font-size:.95rem}
+.lbr.me{border-color:var(--gold);background:rgba(255,207,46,.09)}
+.lbr:nth-child(1){border-color:var(--gold)}
+.lbr:nth-child(2){border-color:#9fb0c9}
+.lbr:nth-child(3){border-color:#b07a3f}
+
+/* TOAST + CONN */
+#tt{position:fixed;left:50%;bottom:22px;transform:translateX(-50%) translateY(150%);background:#101c36;
+  border:1px solid var(--gold-dk);border-left:4px solid var(--gold);padding:13px 20px;border-radius:11px;
+  font-weight:700;font-size:.92rem;z-index:900;transition:transform .28s;max-width:88vw;text-align:center}
+#tt.show{transform:translateX(-50%) translateY(0)}
+#tt.err{border-color:var(--red);border-left-color:var(--red)}
+#cn{position:fixed;top:0;left:0;right:0;background:var(--red);color:#fff;font-size:.78rem;
+  font-weight:800;text-align:center;padding:5px;z-index:950;display:none}
+#cn.show{display:block}
+
+/* COUNTDOWN */
+.cd{display:flex;align-items:center;gap:11px;background:var(--card2);border:2px solid var(--bd);
+  border-radius:12px;padding:11px 15px}
+.cd .num{font-family:'Poppins',sans-serif;font-size:1.5rem;font-weight:800;color:var(--green);
+  min-width:2.4ch;text-align:center}
+.cd .track{flex:1;height:8px;background:var(--bd);border-radius:5px;overflow:hidden}
+.cd .fill{height:100%;background:var(--green);transition:width .3s linear,background .3s}
+.cd.warn{border-color:var(--gold)} .cd.warn .num{color:var(--gold)} .cd.warn .fill{background:var(--gold)}
+.cd.crit{border-color:var(--red)}  .cd.crit .num{color:var(--red)}  .cd.crit .fill{background:var(--red)}
+.cd .lab{font-size:.78rem;color:var(--mut);font-weight:700}
+
+/* THEME BUTTON */
+.thbtn{background:var(--card2);border:1px solid var(--bd);color:var(--tx);border-radius:9px;
+  padding:8px 11px;font-size:.8rem;font-weight:800;width:auto;flex-shrink:0;
+  display:flex;align-items:center;gap:5px;white-space:nowrap}
+</style>
+</head>
+<body>
+
+<div id="cn">⚠️ Connection lost — reconnecting…</div>
+
+<div class="hd">
+  <div class="ttl">कौन बनेगा सिद्धात्मा</div>
+  <div style="display:flex;align-items:center;gap:10px">
+    <div class="me" id="me" style="display:none"><span id="me-name">—</span><b id="me-score">0 pts</b></div>
+    <button class="thbtn" id="btn-theme" onclick="toggleTheme()">🌙</button>
+  </div>
+</div>
+
+<div class="wrap">
+
+  <!-- JOIN -->
+  <div class="pg on" id="p-join">
+    <div class="hero">
+      <h1>कौन बनेगा<br>सिद्धात्मा</h1>
+      <p>दर्शक पोर्टल · Audience Portal</p>
+    </div>
+    <div class="card">
+      <h2>अपना नाम लिखिए</h2>
+      <p style="font-size:.88rem;color:var(--mut)">यही नाम leaderboard पर दिखेगा।<br>
+         This name will appear on the leaderboard.</p>
+      <div id="room-wrap">
+        <input type="text" id="in-room" placeholder="रूम कोड / Room code" maxlength="20"
+               autocapitalize="characters" style="text-transform:uppercase">
+        <div class="hint" style="font-size:.78rem;color:var(--mut);margin-top:6px">
+          होस्ट से रूम कोड पूछिए, या स्क्रीन पर दिया QR स्कैन कीजिए।<br>
+          Ask the host for the room code, or scan the QR on the main screen.
+        </div>
+      </div>
+      <div id="room-locked" style="display:none;font-size:.88rem;color:var(--mut)">
+        रूम / Room: <b id="room-shown" style="color:var(--gold)">—</b>
+        <button class="thbtn" style="margin-left:8px;display:inline-flex" onclick="unlockRoom()">बदलें / Change</button>
+      </div>
+      <input type="text" id="in-name" placeholder="आपका नाम / Your name" maxlength="40" autocomplete="name">
+      <input type="number" id="in-age" placeholder="आयु / Age" min="3" max="120" inputmode="numeric">
+      <input type="tel" id="in-phone" placeholder="मोबाइल नंबर / Mobile number" inputmode="numeric"
+             autocomplete="tel" maxlength="15">
+      <input type="text" id="in-city" placeholder="शहर / City (optional)" maxlength="40">
+      <button class="b-gold" id="btn-join" onclick="join()">खेल में शामिल हों · Join</button>
+    </div>
+  </div>
+
+  <!-- WAITING / BLANK -->
+  <div class="pg" id="p-wait">
+    <div class="wait">
+      <div class="ic">🪷</div>
+      <h2 id="wait-h">प्रतीक्षा कीजिए</h2>
+      <p id="wait-p">मंच पर ध्यान दीजिए।<br>Please watch the main screen.</p>
+    </div>
+  </div>
+
+  <!-- FFF -->
+  <div class="pg" id="p-fff">
+    <div class="card">
+      <span class="pill open" id="fff-pill">⚡ FASTEST FINGER FIRST</span>
+      <div class="q" id="fff-q">—</div>
+      <p style="font-size:.88rem;color:var(--mut)" id="fff-hint">
+        सही क्रम में एक-एक करके टैप कीजिए। दोबारा टैप करने पर चुनाव हटेगा।<br>
+        Tap the items in the correct order.</p>
+    </div>
+    <div class="opts" id="fff-items"></div>
+    <button class="b-purple" id="fff-submit" onclick="fffSubmit()" disabled>0 / 0 चुने गए</button>
+    <div id="fff-result"></div>
+  </div>
+
+  <!-- POLL -->
+  <div class="pg" id="p-poll">
+    <div class="cd" id="poll-cd" style="display:none">
+      <span class="num">30</span>
+      <span class="track"><span class="fill" style="width:100%"></span></span>
+      <span class="lab">sec</span>
+    </div>
+    <div class="card">
+      <span class="pill open" id="poll-pill">📊 दर्शक मतदान · AUDIENCE POLL</span>
+      <div class="q" id="poll-q">—</div>
+      <p style="font-size:.88rem;color:var(--mut)">विकल्प चुनिए — बदल भी सकते हैं। फिर Submit दबाइए।<br>
+        Pick an answer — you can change it — then press Submit.</p>
+    </div>
+    <div class="opts" id="poll-opts"></div>
+    <button class="b-gold" id="poll-submit" onclick="pollSubmit()" disabled>विकल्प चुनिए · Select an option</button>
+    <div id="poll-note"></div>
+  </div>
+
+  <!-- AUDIENCE QUESTION -->
+  <div class="pg" id="p-audq">
+    <div class="cd" id="audq-cd" style="display:none">
+      <span class="num">30</span>
+      <span class="track"><span class="fill" style="width:100%"></span></span>
+      <span class="lab">sec</span>
+    </div>
+    <div class="card">
+      <span class="pill open" id="audq-pill">📢 दर्शक प्रश्न · +10 अंक</span>
+      <div class="q" id="audq-q">—</div>
+    </div>
+    <div class="opts" id="audq-opts"></div>
+    <button class="b-gold" id="audq-submit" onclick="audqSubmit()" disabled>विकल्प चुनिए · Select an option</button>
+    <div id="audq-result"></div>
+  </div>
+
+  <!-- LEADERBOARD -->
+  <div class="pg" id="p-lb">
+    <div class="card" style="padding:14px 18px">
+      <h2 id="lb-title" style="text-align:center">🏆 Leaderboard</h2>
+    </div>
+    <div class="lb" id="lb-rows"></div>
+    <div id="lb-mine"></div>
+  </div>
+
+</div>
+
+<div id="tt"></div>
+
+<script>
+/* ═══ AUDIENCE PHONE — reads mobile_state, writes only its own answers ═══ */
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBvFw7TNIflcBbms-K4sk_jrqgdzYYJKok",
+  authDomain: "kounbanegasiddhatma.firebaseapp.com",
+  databaseURL: "https://kounbanegasiddhatma-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "kounbanegasiddhatma",
+  storageBucket: "kounbanegasiddhatma.firebasestorage.app",
+  messagingSenderId: "53011686572",
+  appId: "1:53011686572:web:f9b02eb2aed988c9ed6b09"
+};
+/* Named app so opening the audience page in the same browser as the host
+   controller can never take over the host's sign-in session. */
+const app  = firebase.initializeApp(firebaseConfig, 'audience');
+const db   = firebase.database(app);
+const auth = firebase.auth(app);
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+/* ---- ROOM: from the QR link (?room=XYZ), or typed in by hand ---- */
+const cleanRoom = s => String(s||'').toUpperCase().replace(/[^A-Z0-9-]/g,'').slice(0,20);
+let ROOM = cleanRoom(new URLSearchParams(location.search).get('room'));
+if(!ROOM){ try { ROOM = cleanRoom(localStorage.getItem('kbs-room')); } catch(e){} }
+const R = p => `rooms/${ROOM}/${p}`;
+let roomRefs = [];
+
+let uid = null, myName = '', myScore = 0, MS = null, srvOffset = 0;
+let fffPick = [];                 // indices into display array, in tap order
+let answered = { fff:null, poll:null, audq:null };
+
+const now = () => Date.now() + srvOffset;
+
+function toast(msg, err){
+  const t = $('tt'); t.textContent = msg; t.classList.toggle('err', !!err);
+  t.classList.add('show'); clearTimeout(t._t);
+  t._t = setTimeout(()=>t.classList.remove('show'), 2600);
+}
+function page(id){
+  document.querySelectorAll('.pg').forEach(p=>p.classList.remove('on'));
+  ($('p-'+id) || $('p-wait')).classList.add('on');
+}
+
+/* ---- AUTH ---- */
+auth.signInAnonymously().catch(e=>{
+  toast('Sign-in failed: ' + e.code, true);
+  $('btn-join').disabled = true;
+  $('btn-join').textContent = 'Cannot connect — ask the host';
+});
+auth.onAuthStateChanged(u=>{
+  if(!u) return;
+  uid = u.uid;
+  db.ref('.info/serverTimeOffset').on('value', s => srvOffset = s.val() || 0);
+  db.ref('.info/connected').on('value', s => $('cn').classList.toggle('show', s.val() !== true));
+
+  paintRoomField();
+  if(!ROOM) return;
+  // rejoin automatically if this phone already registered in this room
+  db.ref(R('players/'+uid)).once('value').then(s=>{
+    const p = s.val();
+    if(p && p.name){
+      myName = p.name; myScore = p.score || 0;
+      showMe(); listen();
+    }
+  }).catch(()=>{});
+});
+
+function paintRoomField(){
+  const known = !!ROOM;
+  $('room-wrap').style.display   = known ? 'none' : '';
+  $('room-locked').style.display = known ? '' : 'none';
+  if(known) $('room-shown').textContent = ROOM;
+}
+function unlockRoom(){
+  ROOM = '';
+  try { localStorage.removeItem('kbs-room'); } catch(e){}
+  $('in-room').value = '';
+  paintRoomField();
+}
+
+function showMe(){
+  $('me').style.display = '';
+  $('me-name').textContent = myName;
+  $('me-score').textContent = myScore + ' pts';
+}
+
+function join(){
+  if(!ROOM){
+    const r = cleanRoom($('in-room').value);
+    if(r.length < 2) return toast('रूम कोड लिखिए / Enter the room code', true);
+    ROOM = r;
+  }
+  const name = $('in-name').value.trim();
+  const city = $('in-city').value.trim();
+  const ageRaw = $('in-age').value.trim();
+  if(name.length < 2) return toast('कृपया अपना नाम लिखिए / Enter your name', true);
+  if(!ageRaw) return toast('कृपया अपनी आयु लिखिए / Enter your age', true);
+  const age = parseInt(ageRaw, 10);
+  if(isNaN(age) || age < 3 || age > 120) return toast('सही आयु लिखिए / Enter a valid age', true);
+  const phone = $('in-phone').value.replace(/[^0-9]/g, '');
+  if(phone.length < 10 || phone.length > 15) return toast('10 अंकों का मोबाइल नंबर लिखिए / Enter a valid mobile number', true);
+  $('btn-join').disabled = true;
+  // confirm the room actually exists before writing anything into it
+  db.ref(`rooms/${ROOM}/meta`).once('value').then(s=>{
+    if(!s.exists()){
+      $('btn-join').disabled = false;
+      ROOM = ''; paintRoomField();
+      throw new Error('__noroom__');
+    }
+    return db.ref(R('players/'+uid)).update({name, city, age, phone, score:0, joinedAt: Date.now()});
+  }).then(()=>{
+    try { localStorage.setItem('kbs-room', ROOM); } catch(e){}
+    myName = name; showMe(); paintRoomField(); listen();
+    db.ref(R('players/'+uid+'/score')).on('value', s=>{ myScore = s.val() || 0; if(myName) showMe(); });
+    toast('स्वागत है, ' + name + '!');
+  }).catch(e=>{
+    $('btn-join').disabled = false;
+    if(e.message === '__noroom__') toast('यह रूम कोड सही नहीं है / No such room code', true);
+    else toast('Join failed: ' + e.message, true);
+  });
+}
+
+/* ---- MAIN LISTENER ---- */
+function listen(){
+  db.ref(R('mobile_state')).on('value', s=>{
+    MS = s.val() || {mode:'blank'};
+    render();
+  });
+}
+
+function render(){
+  const mode = MS.mode || 'blank';
+
+  if(mode === 'blank'){
+    page('wait');
+    $('wait-h').textContent = 'प्रतीक्षा कीजिए';
+    $('wait-p').innerHTML = 'मंच पर ध्यान दीजिए।<br>Please watch the main screen.';
+    return;
+  }
+  if(mode === 'fff')         return renderFFF();
+  if(mode === 'poll')        return renderPoll();
+  if(mode === 'audq')        return renderAudQ();
+  if(mode === 'leaderboard') return renderLB();
+  page('wait');
+}
+
+/* ---- FFF ---- */
+function renderFFF(){
+  const f = MS.fff;
+  if(!f) return page('wait');
+  page('fff');
+
+  // new round → reset local state
+  if(answered.fff !== f.id && fffPick._id !== f.id){ fffPick = []; fffPick._id = f.id; }
+
+  $('fff-q').textContent = f.text;
+  const submitted = answered.fff === f.id;
+  const items = f.display || [];
+
+  $('fff-items').innerHTML = items.map((t,i)=>{
+    const pos = fffPick.indexOf(i);
+    let cls = 'fitem' + (pos >= 0 ? ' picked' : '');
+    let num = pos >= 0 ? pos+1 : '';
+    if(f.revealed && submitted){
+      const correctPos = (f.correct||[]).indexOf(t);
+      cls = 'fitem ' + (pos === correctPos ? 'correctpos' : 'wrongpos');
+      num = correctPos + 1;
+    }
+    return `<button class="${cls}" ${(!f.open||submitted||f.revealed)?'disabled':''} onclick="fffTap(${i})">
+      <span class="num">${num}</span><span>${esc(t)}</span></button>`;
+  }).join('');
+
+  const pill = $('fff-pill');
+  const btn = $('fff-submit');
+  if(f.revealed){
+    pill.className = 'pill done'; pill.textContent = '✅ सही क्रम दिखाया गया';
+    btn.style.display = 'none';
+    $('fff-hint').innerHTML = submitted ? 'हरा = आपका क्रम सही था। Green = you had it right.'
+                                        : 'आपने इस दौर में भाग नहीं लिया।';
+  } else if(submitted){
+    pill.className = 'pill done'; pill.textContent = '✔ आपका उत्तर दर्ज हुआ';
+    btn.style.display = 'none';
+    $('fff-hint').innerHTML = 'परिणाम की प्रतीक्षा कीजिए।<br>Waiting for results.';
+  } else if(!f.open){
+    pill.className = 'pill shut'; pill.textContent = '⏹ समय समाप्त · CLOSED';
+    btn.style.display = 'none';
+    $('fff-hint').textContent = 'इस दौर का समय समाप्त हो गया।';
+  } else {
+    pill.className = 'pill open'; pill.textContent = '⚡ FASTEST FINGER FIRST';
+    btn.style.display = '';
+    const n = fffPick.length, total = items.length;
+    btn.textContent = n === total ? '🚀 उत्तर भेजें · SUBMIT' : `${n} / ${total} चुने गए`;
+    btn.disabled = n !== total;
+  }
+  $('fff-result').innerHTML = '';
+}
+function fffTap(i){
+  const f = MS?.fff;
+  if(!f || !f.open || answered.fff === f.id) return;
+  const at = fffPick.indexOf(i);
+  if(at >= 0) fffPick.splice(at, 1);
+  else fffPick.push(i);
+  renderFFF();
+}
+function fffSubmit(){
+  const f = MS?.fff;
+  if(!f || !f.open) return toast('समय समाप्त / Round closed', true);
+  if(fffPick.length !== (f.display||[]).length) return;
+  const order = fffPick.map(i => f.display[i]);
+  db.ref(R(`fff_answers/${f.id}/${uid}`)).set({order, at: now(), name: myName})
+    .then(()=>{ answered.fff = f.id; toast('✔ उत्तर भेजा गया!'); renderFFF(); })
+    .catch(e=>toast(e.code === 'PERMISSION_DENIED' ? 'आप पहले ही उत्तर दे चुके हैं' : e.message, true));
+}
+
+/* ---- POLL ---- */
+let pollSel = null;          // chosen but not yet submitted — freely changeable
+let pollSelFor = null;
+
+function renderPoll(){
+  const p = MS.poll;
+  if(!p) return page('wait');
+  page('poll');
+  if(pollSelFor !== p.id){ pollSel = null; pollSelFor = p.id; }
+
+  $('poll-q').textContent = p.text;
+  const voted = answered.poll === p.id;
+  const hidden = p.hidden || [];
+  const live = p.open && !voted;
+
+  $('poll-opts').innerHTML = ['A','B','C','D'].map(k=>{
+    if(hidden.includes(k)) return '';
+    const chosen = voted ? (answered.pollVal === k) : (pollSel === k);
+    return `<button class="opt ${chosen?'sel':''}" ${live?'':'disabled'} onclick="pollPick('${k}')">
+      <span class="k">${k}</span><span>${esc(p[k.toLowerCase()])}</span></button>`;
+  }).join('');
+
+  const pill = $('poll-pill'), btn = $('poll-submit');
+  if(voted){
+    pill.className='pill done'; pill.textContent='✔ आपका मत दर्ज हुआ';
+    btn.style.display = 'none';
+    $('poll-note').innerHTML = `<div class="card"><p>धन्यवाद! परिणाम मुख्य स्क्रीन पर दिखेगा।<br>
+      <span style="color:var(--mut);font-size:.88rem">Thank you — results are on the main screen.</span></p></div>`;
+  } else if(!p.open){
+    pill.className='pill shut'; pill.textContent='⏹ मतदान बंद · CLOSED';
+    btn.style.display = 'none';
+    $('poll-note').innerHTML = `<div class="card"><p>मतदान समाप्त हो चुका है।</p></div>`;
+  } else {
+    pill.className='pill open'; pill.textContent='📊 दर्शक मतदान · VOTE NOW';
+    btn.style.display = '';
+    btn.disabled = !pollSel;
+    btn.textContent = pollSel ? `✔ ${pollSel} भेजें · Submit ${pollSel}` : 'विकल्प चुनिए · Select an option';
+    $('poll-note').innerHTML = '';
+  }
+}
+function pollPick(k){
+  const p = MS?.poll;
+  if(!p || !p.open || answered.poll === p.id) return;
+  pollSel = (pollSel === k) ? null : k;   // tap again to deselect
+  renderPoll();
+}
+let pollSending = false;
+function pollSubmit(auto){
+  const p = MS?.poll;
+  if(!p || answered.poll === p.id || pollSending) return;
+  if(!pollSel) return;
+  pollSending = true;
+  setTimeout(()=>{ pollSending = false; }, 4000);
+  db.ref(R(`poll_votes/${p.id}/${uid}`)).set(pollSel)
+    .then(()=>{
+      answered.poll = p.id; answered.pollVal = pollSel;
+      toast(auto ? '⏰ समय समाप्त — ' + pollSel + ' भेजा गया' : '✔ मत दर्ज हुआ');
+      renderPoll();
+    })
+    .catch(e=>toast(e.code === 'PERMISSION_DENIED' ? 'आप पहले ही मत दे चुके हैं' : e.message, true));
+}
+
+/* ---- AUDIENCE QUESTION ---- */
+let audqSel = null, audqSelFor = null, audqSending = false;
+
+function renderAudQ(){
+  const q = MS.audq;
+  if(!q) return page('wait');
+  page('audq');
+  if(audqSelFor !== q.id){ audqSel = null; audqSelFor = q.id; }
+
+  $('audq-q').textContent = q.text;
+  const done = answered.audq === q.id;
+  const mine = answered.audqVal;
+  const live = q.open && !done && !q.revealed;
+
+  $('audq-opts').innerHTML = ['A','B','C','D'].map(k=>{
+    let cls = 'opt';
+    if(q.revealed){
+      if(k === q.correct) cls += ' right';
+      else if(done && k === mine) cls += ' wrongsel';
+      else cls += ' dim';
+    } else if(done ? (k === mine) : (audqSel === k)) cls += ' sel';
+    return `<button class="${cls}" ${live?'':'disabled'} onclick="audqPick('${k}')">
+      <span class="k">${k}</span><span>${esc(q[k.toLowerCase()])}</span></button>`;
+  }).join('');
+
+  const sub = $('audq-submit');
+  if(live){
+    sub.style.display = '';
+    sub.disabled = !audqSel;
+    sub.textContent = audqSel ? `✔ ${audqSel} भेजें · Submit ${audqSel}` : 'विकल्प चुनिए · Select an option';
+  } else {
+    sub.style.display = 'none';
+  }
+
+  const pill = $('audq-pill');
+  const out = $('audq-result');
+  if(q.revealed){
+    pill.className='pill done'; pill.textContent='✅ उत्तर प्रकट';
+    if(done){
+      const ok = mine === q.correct;
+      out.innerHTML = `<div class="res ${ok?'win':'lose'}">
+        <div class="big">${ok?'✓ सही!':'✗ ग़लत'}</div>
+        <div class="sm">${ok?'आपको <b>+10 अंक</b> मिले।':'सही उत्तर: <b>'+esc(q.correct)+'</b>'}</div>
+        ${q.explanation?`<div class="sm" style="margin-top:6px;color:var(--mut)">${esc(q.explanation)}</div>`:''}
+      </div>`;
+    } else {
+      out.innerHTML = `<div class="card"><p>सही उत्तर: <b style="color:var(--green)">${esc(q.correct)}</b>
+        ${q.explanation?`<br><span style="font-size:.9rem;color:var(--mut)">${esc(q.explanation)}</span>`:''}</p></div>`;
+    }
+  } else if(done){
+    pill.className='pill done'; pill.textContent='✔ उत्तर दर्ज हुआ';
+    out.innerHTML = `<div class="card"><p>उत्तर भेज दिया गया। परिणाम की प्रतीक्षा कीजिए।<br>
+      <span style="color:var(--mut);font-size:.88rem">Answer submitted — waiting for the reveal.</span></p></div>`;
+  } else if(!q.open){
+    pill.className='pill shut'; pill.textContent='⏹ समय समाप्त';
+    out.innerHTML = '';
+  } else {
+    pill.className='pill open'; pill.textContent='📢 दर्शक प्रश्न · +10 अंक';
+    out.innerHTML = '';
+  }
+}
+function audqPick(k){
+  const q = MS?.audq;
+  if(!q || !q.open || answered.audq === q.id || q.revealed) return;
+  audqSel = (audqSel === k) ? null : k;   // change your mind as often as you like
+  renderAudQ();
+}
+function audqSubmit(auto){
+  const q = MS?.audq;
+  if(!q || answered.audq === q.id || audqSending || !audqSel) return;
+  audqSending = true;
+  setTimeout(()=>{ audqSending = false; }, 4000);
+  db.ref(R(`audience_answers/${q.id}/${uid}`)).set({ans:audqSel, at: now(), name: myName})
+    .then(()=>{
+      answered.audq = q.id; answered.audqVal = audqSel;
+      toast(auto ? '⏰ समय समाप्त — ' + audqSel + ' भेजा गया' : '✔ उत्तर भेजा गया');
+      renderAudQ();
+    })
+    .catch(e=>toast(e.code === 'PERMISSION_DENIED' ? 'आप पहले ही उत्तर दे चुके हैं' : e.message, true));
+}
+
+/* ---- LEADERBOARD ---- */
+function renderLB(){
+  const lb = MS.leaderboard;
+  if(!lb) return page('wait');
+  page('lb');
+  $('lb-title').textContent = lb.title || '🏆 Leaderboard';
+  const rows = lb.rows || [];
+  $('lb-rows').innerHTML = rows.length ? rows.map(r=>
+    `<div class="lbr ${r.name === myName ? 'me':''}">
+       <span class="r">#${r.rank}</span><span>${esc(r.name)}</span><span class="d">${esc(r.detail)}</span>
+     </div>`).join('') : '<div class="card"><p style="text-align:center;color:var(--mut)">कोई प्रविष्टि नहीं</p></div>';
+
+  const inTop = rows.some(r => r.name === myName);
+  $('lb-mine').innerHTML = inTop ? '' :
+    `<div class="card" style="margin-top:6px"><p style="text-align:center">
+       आपके अंक: <b style="color:var(--green)">${myScore}</b><br>
+       <span style="font-size:.86rem;color:var(--mut)">Keep playing to reach the top 10!</span></p></div>`;
+}
+
+/* ---- THEME — each phone picks its own ---- */
+function applyTheme(t){
+  document.documentElement.setAttribute('data-theme', t);
+  $('btn-theme').innerHTML = t === 'light' ? '☀️ Light' : '🌙 Dark';
+  const m = document.querySelector('meta[name="theme-color"]');
+  if(m) m.setAttribute('content', t === 'light' ? '#f3f1e9' : '#060d1f');
+}
+function toggleTheme(){
+  const t = document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+  applyTheme(t);
+  try { localStorage.setItem('kbs-theme', t); } catch(e){}
+}
+(function initTheme(){
+  let t = 'dark';
+  try { t = localStorage.getItem('kbs-theme') || 'dark'; } catch(e){}
+  applyTheme(t);
+})();
+
+/* ---- COUNTDOWNS — and auto-lock the poll when time runs out ---- */
+function paintCountdown(el, endsAt, duration){
+  if(!el) return;
+  const left = Math.max(0, (endsAt - now()) / 1000);
+  el.style.display = '';
+  el.querySelector('.num').textContent = Math.ceil(left);
+  el.querySelector('.fill').style.width = Math.max(0, Math.min(100, left / (duration || 30) * 100)) + '%';
+  el.classList.toggle('warn', left <= 10 && left > 5);
+  el.classList.toggle('crit', left <= 5);
+  return left;
+}
+setInterval(()=>{
+  const mode = MS?.mode;
+
+  if(mode === 'poll' && MS.poll?.endsAt){
+    const p = MS.poll;
+    const voted = answered.poll === p.id;
+    if(p.open && !voted){
+      const left = paintCountdown($('poll-cd'), p.endsAt, p.duration);
+      if(left <= 0 && pollSel){ pollSubmit(true); }      // whatever is selected gets locked in
+      else if(left <= 0){ $('poll-cd').classList.add('crit'); }
+    } else {
+      $('poll-cd').style.display = 'none';
+    }
+  }
+
+  if(mode === 'audq' && MS.audq?.endsAt){
+    const q = MS.audq;
+    if(q.open && answered.audq !== q.id && !q.revealed){
+      const left = paintCountdown($('audq-cd'), q.endsAt, q.duration);
+      if(left <= 0 && audqSel) audqSubmit(true);   // lock in whatever is selected
+    } else {
+      $('audq-cd').style.display = 'none';
+    }
+  }
+}, 250);
+</script>
+</body>
+</html>

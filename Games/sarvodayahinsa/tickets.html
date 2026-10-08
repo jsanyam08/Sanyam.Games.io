@@ -1,0 +1,460 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tambola Ticket Generator — Sarvodaya Ahinsa</title>
+
+<link rel="stylesheet" href="assets/ui.css?v=1790175980">
+
+<style>
+.gen{max-width:880px;margin:0 auto}
+.ranges{border:1px dashed var(--bd-lt);border-radius:var(--r-sm);padding:12px;margin-top:12px}
+.range-row{display:flex;align-items:center;gap:9px;margin-bottom:7px}
+.range-row label{min-width:78px;font-size:13px;font-weight:700;color:var(--tx-mut)}
+.range-row input{max-width:110px}
+
+#print-controls{
+  position:fixed;right:18px;bottom:18px;z-index:50;width:min(280px,calc(100vw - 36px));
+  background:var(--panel);border:1px solid var(--primary);border-radius:var(--r);
+  padding:14px;box-shadow:0 14px 40px rgba(0,0,0,.45);display:none;
+}
+
+/* ── the sheet ────────────────────────────────────────────────────
+   Tickets are always printed, never read on screen, so they are drawn
+   in print colours from the start — black on white, whatever theme the
+   rest of the site is wearing. What you see here is what comes out.
+   Everything is sized in millimetres against a real A4 sheet. */
+#out{margin-top:18px}
+.page{
+  background:#fff;margin:0 auto 18px;box-shadow:0 8px 30px rgba(0,0,0,.35);
+  display:grid;box-sizing:border-box;
+}
+.cell{
+  display:flex;align-items:stretch;box-sizing:border-box;
+  border-right:1px dashed #c3cbd6;border-bottom:1px dashed #c3cbd6;
+  padding:3mm;position:relative;
+}
+/* no cut guide along the outer edge — there is nothing to cut there */
+.cell.last-col{border-right:none}
+.cell.last-row{border-bottom:none}
+.cell.cutmark::after{
+  content:'✂';position:absolute;right:-6px;bottom:-8px;z-index:2;
+  font-size:10px;color:#b9c2ce;background:#fff;padding:0 1px;line-height:1;
+}
+
+.tk{
+  flex:1;display:flex;flex-direction:column;
+  border:2px solid #d6dce6;border-radius:14px;padding:3mm 3.5mm;
+  background:#fff;color:#111;box-sizing:border-box;overflow:hidden;
+}
+.tk .hd{display:flex;align-items:center;gap:6px;margin-bottom:2.5mm}
+.tk .hd img{height:6.5mm;width:auto}
+.tk .hd .nm{
+  font-family:'Mukta','Noto Sans Devanagari',sans-serif;font-weight:800;
+  color:#12161d;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.tk .hd .sr{font-family:'Poppins',sans-serif;font-weight:700;color:#8a93a1;letter-spacing:.04em}
+.tk .gr{display:grid;gap:2mm;flex:1}
+.tk .gr div{
+  display:grid;place-items:center;border-radius:9px;
+  background:#eef1f6;border:1px solid #e0e5ec;color:#12161d;
+  font-family:'Poppins','Mukta',sans-serif;font-weight:800;
+}
+.tk .gr div.e{background:#fafbfc;border-color:#f1f3f6}
+.tk .ft{
+  margin-top:2mm;font-family:'Poppins',sans-serif;font-weight:600;
+  color:#9aa3b0;text-align:center;letter-spacing:.05em;
+}
+
+@media print{
+  .no-print{display:none !important}
+  body{background:#fff !important}
+  body::before{display:none}
+  .wrap{width:100% !important;padding:0 !important}
+  #out{margin:0}
+  .page{
+    box-shadow:none;margin:0;
+    break-after:page;page-break-after:always;   /* exactly one sheet each */
+  }
+  .page:last-child{break-after:auto;page-break-after:auto}
+}
+</style>
+<!-- Rewritten every time tickets are generated, so the browser's print
+     dialog already shows the right paper and orientation and nobody has
+     to switch it by hand. -->
+<style id="print-style">@page{size:A4 landscape;margin:6mm}</style>
+</head>
+<body>
+
+<div class="wrap" style="padding:16px 0">
+
+  <div class="no-print gen col" style="gap:14px">
+    <div class="row" style="gap:12px">
+      <img id="logo" style="height:42px" alt="">
+      <div><h1 style="font-size:20px" id="l-title"></h1>
+        <div class="sm mut" id="l-sub"></div></div>
+      <div class="grow"></div>
+      <button class="btn sm ghost" id="lang-btn"></button>
+      <button class="btn sm ghost" id="mode-btn">◐</button>
+      <a class="btn sm ghost" href="index.html" id="l-home"></a>
+    </div>
+
+    <form class="card col" style="gap:13px" id="gen-form">
+
+      <div><label class="f" id="l-style"></label>
+        <div class="col" style="gap:7px">
+          <label class="chk sub"><input type="radio" name="style" value="simple" checked>
+            <span id="l-st-s"></span></label>
+          <label class="chk sub"><input type="radio" name="style" value="housie">
+            <span id="l-st-h"></span></label>
+        </div></div>
+
+      <div class="grid g3">
+        <div><label class="f" id="l-code"></label>
+          <input type="text" id="code" maxlength="12"
+                 style="text-transform:uppercase;letter-spacing:.14em;font-weight:700">
+          <div class="sm mut" style="margin-top:4px" id="l-codeh"></div></div>
+        <div><label class="f" id="l-total"></label>
+          <input type="number" id="numTickets" min="1" max="2000" value="24" required></div>
+        <div><label class="f" id="l-from"></label>
+          <input type="number" id="from" min="1" value="1" required></div>
+      </div>
+
+      <div class="grid g3">
+        <div><label class="f" id="l-layout"></label>
+          <select id="tpp">
+            <option value="4" selected>4</option>
+            <option value="2">2</option>
+            <option value="6">6</option>
+            <option value="8">8</option>
+          </select>
+          <div class="sm mut" style="margin-top:4px" id="l-pagenote"></div></div>
+        <div><label class="f" id="l-show"></label>
+          <input type="text" id="title" placeholder="अक्षयनिधि तंबोला"></div>
+      </div>
+
+      <div id="simple-only">
+        <div class="grid g3">
+          <div><label class="f" id="l-rows"></label>
+            <input type="number" id="rows" value="3" min="1" max="6"></div>
+          <div><label class="f" id="l-cols"></label>
+            <select id="cols">
+              <option value="3" selected>3</option><option value="4">4</option>
+              <option value="5">5</option><option value="9">9</option>
+            </select></div>
+        </div>
+        <div class="ranges">
+          <h3 style="font-size:13px;margin-bottom:9px" id="l-ranges"></h3>
+          <div id="range-inputs"></div>
+        </div>
+      </div>
+
+      <div class="sub sm mut" id="verify-note"></div>
+
+      <div class="row wrap-r" style="gap:8px">
+        <button type="submit" class="btn p" id="btn-generate"></button>
+        <button type="button" class="btn" id="btn-print" disabled></button>
+        <span class="grow"></span>
+        <span class="sm mut" id="count-note"></span>
+      </div>
+      <div class="sm" id="error-msg" style="color:var(--bad);display:none"></div>
+    </form>
+  </div>
+
+  <div id="out"></div>
+</div>
+
+<div id="print-controls" class="no-print">
+  <h3 style="font-size:15px;color:var(--primary);margin-bottom:8px" id="l-ready"></h3>
+  <p class="sm mut" style="margin-bottom:10px" id="l-tip"></p>
+  <button class="btn p wide" id="pc-print" style="margin-bottom:8px"></button>
+  <button class="btn ghost wide" id="pc-edit" style="margin-bottom:8px"></button>
+  <a class="btn ghost wide" href="index.html" id="pc-home"></a>
+</div>
+
+<div id="toast"></div>
+
+<script src="assets/brand.js?v=1790175980"></script>
+<script src="assets/i18n.js?v=1790175980"></script>
+<script src="assets/theme.js?v=1790175980"></script>
+<script src="assets/text.js?v=1790175980"></script>
+<script src="assets/fb.js?v=1790175980"></script>
+<script src="assets/engine.js?v=1790175980"></script>
+<script src="assets/types/tambola.js?v=1790175980"></script>
+<script>
+/* ═══ PAPER TICKETS ══════════════════════════════════════════════
+   Two styles, because two things are true at once:
+
+   • The LIVE game deals a standard 3×9 housie ticket. Paper tickets in
+     that style come from the very same generator, seeded by
+     (show code + serial) — so ticket #0037 printed today is byte for
+     byte the ticket the host sees when they type 37 into the claim
+     checker. No ticket database, nothing to lose, nothing to sync.
+
+   • The अक्षय निधि board has always used a simpler grid with ranges you
+     choose per row. That is kept, and it is the default.
+   ═══════════════════════════════════════════════════════════════ */
+
+const $ = SA.$;
+let generated = 0;
+
+const A4 = { long: 297, short: 210, margin: 6 };   // millimetres
+
+/* how tickets sit on the sheet, per "tickets per page" choice */
+const LAYOUTS = {
+  2: { cols: 1, rows: 2, orient: 'portrait'  },
+  4: { cols: 2, rows: 2, orient: 'landscape' },
+  6: { cols: 2, rows: 3, orient: 'portrait'  },
+  8: { cols: 2, rows: 4, orient: 'portrait'  }
+};
+
+$('logo').src = SA.brand.logo;
+SA.theme.apply({ preset: 'neon' }, SA.theme.savedMode());
+$('mode-btn').onclick = () => SA.theme.toggleMode();
+$('lang-btn').onclick = () => SA.i18n.toggle();
+SA.i18n.onChange(labels);
+
+/* ---------- deterministic simple-grid ticket ---------- */
+function rng(seed) {
+  let s = 0; const str = String(seed);
+  for (let i = 0; i < str.length; i++) s = (s * 31 + str.charCodeAt(i)) | 0;
+  s = Math.abs(s) || 7;
+  return () => { s = (s * 1103515245 + 12345) & 0x7fffffff; return s / 0x7fffffff; };
+}
+
+function makeSimple(seed, rows, cols, ranges) {
+  const rnd = rng(seed);
+  const grid = [];
+  for (let r = 0; r < rows; r++) {
+    const [lo, hi] = ranges[r] || [1, 90];
+    const pool = [];
+    for (let v = lo; v <= hi; v++) pool.push(v);
+    for (let i = pool.length - 1; i > 0; i--) {
+      const j = Math.floor(rnd() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]];
+    }
+    grid.push(pool.slice(0, cols).sort((a, b) => a - b));
+  }
+  return grid;
+}
+
+const serial = n => '#' + String(n).padStart(4, '0');
+
+/* ---------- labels ---------- */
+function labels() {
+  document.title = SA.t('tk.title') + ' — ' + SA.brand.nameEn;
+  $('lang-btn').textContent = SA.t('lang_toggle');
+  $('mode-btn').title = SA.t('theme_toggle');
+  $('l-title').textContent  = SA.t('tk.title');
+  $('l-sub').textContent    = SA.t('tk.sub');
+  $('l-home').textContent   = '↩ ' + SA.t('tk.home');
+  $('l-style').textContent  = SA.t('tk.style');
+  $('l-st-h').textContent   = SA.t('tk.style.housie');
+  $('l-st-s').textContent   = SA.t('tk.style.simple');
+  $('l-code').textContent   = SA.t('tk.code');
+  $('code').placeholder     = SA.t('tk.code_ph');
+  $('l-codeh').textContent  = SA.t('tk.code_hint');
+  $('l-total').textContent  = SA.t('tk.total');
+  $('l-from').textContent   = SA.t('tk.from');
+  $('l-layout').textContent = SA.t('tk.layout');
+  $('l-show').textContent   = SA.t('tk.show_name');
+  $('l-rows').textContent   = SA.t('tk.rows');
+  $('l-cols').textContent   = SA.t('tk.cols');
+  $('l-ranges').textContent = SA.t('tk.ranges');
+  $('btn-generate').textContent = '🎟️ ' + SA.t('tk.generate');
+  $('btn-print').textContent    = '🖨 ' + SA.t('tk.print_save');
+  $('l-ready').textContent  = SA.t('tk.ready');
+  $('l-tip').innerHTML      = SA.t('tk.print_tip');
+  $('pc-print').textContent = '🖨 ' + SA.t('tk.print_save');
+  $('pc-edit').textContent  = SA.t('tk.edit_set');
+  $('pc-home').textContent  = '🏠 ' + SA.t('tk.home');
+  [...$('tpp').options].forEach(o => {
+    const L = LAYOUTS[o.value];
+    o.textContent = SA.t('tk.per_page', { x: o.value }) + ' · A4 ' + SA.t('tk.' + L.orient);
+  });
+  pageNote(); drawRanges(); note();
+  $('count-note').textContent = generated ? SA.t('tk.preview_n', { x: generated }) : '';
+}
+
+function pageNote() {
+  const per = Number($('tpp').value) || 4;
+  $('l-pagenote').textContent = SA.t('tk.page_note', {
+    n: per, o: SA.t('tk.' + LAYOUTS[per].orient)
+  });
+}
+
+function style() { return document.querySelector('[name="style"]:checked').value; }
+
+function note() {
+  const custom = style() === 'simple' && !defaultRanges();
+  $('verify-note').innerHTML =
+    (style() === 'housie' || !custom ? '✅ ' + SA.t('tk.verify_ok') : '⚠️ ' + SA.t('tk.verify_no')) +
+    '<br><span class="mut">' + SA.t('tk.why_code') + '</span>';
+}
+
+function rowCount() { return Math.max(1, Math.min(6, Number($('rows').value) || 3)); }
+
+function drawRanges() {
+  const box = $('range-inputs');
+  const n = rowCount();
+  const old = readRanges();
+  box.innerHTML = Array.from({ length: n }, (_, i) => {
+    const [lo, hi] = old[i] || [1, 90];
+    return `<div class="range-row">
+      <label>${SA.esc(SA.t('tk.row_n', { x: i + 1 }))}</label>
+      <input type="number" id="min-${i}" value="${lo}" min="1" max="90" required>
+      <span class="sm mut">${SA.esc(SA.t('tk.to'))}</span>
+      <input type="number" id="max-${i}" value="${hi}" min="1" max="90" required>
+    </div>`;
+  }).join('');
+  box.querySelectorAll('input').forEach(el => el.onchange = note);
+}
+
+function readRanges() {
+  const n = rowCount(), out = [];
+  for (let i = 0; i < n; i++) {
+    const lo = $('min-' + i), hi = $('max-' + i);
+    out.push([lo ? Number(lo.value) : 1, hi ? Number(hi.value) : 90]);
+  }
+  return out;
+}
+const defaultRanges = () => readRanges().every(([lo, hi]) => lo === 1 && hi === 90);
+
+/* ---------- form behaviour ---------- */
+document.querySelectorAll('[name="style"]').forEach(el => el.onchange = () => {
+  $('simple-only').classList.toggle('hide', style() !== 'simple');
+  note();
+});
+$('cols').onchange = note;
+$('rows').onchange = () => { drawRanges(); note(); };
+$('tpp').onchange = pageNote;
+$('code').addEventListener('input', e => {
+  e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, '');
+});
+
+$('code').value = (SA.qs('c') || '').toUpperCase();
+$('title').value = SA.qs('t') || '';
+labels();
+
+function fail(msg) {
+  const e = $('error-msg');
+  e.textContent = msg; e.style.display = 'block';
+  setTimeout(() => { e.style.display = 'none'; }, 6000);
+}
+
+/* ---------- generate ---------- */
+$('gen-form').onsubmit = ev => {
+  ev.preventDefault();
+  const code = $('code').value.trim().toUpperCase();
+  if (!code) { $('code').focus(); fail(SA.t('tk.need_code')); return; }
+
+  const from  = Math.max(1, Number($('from').value) || 1);
+  const count = Math.max(1, Math.min(2000, Number($('numTickets').value) || 1));
+  const per   = Number($('tpp').value) || 4;
+  const L     = LAYOUTS[per];
+  const title = $('title').value.trim() || 'अक्षयनिधि तंबोला';
+  const st    = style();
+
+  let rows = 3, cols = 9, ranges = null;
+  if (st === 'simple') {
+    rows = rowCount();
+    cols = Number($('cols').value) || 3;
+    ranges = readRanges();
+    for (let i = 0; i < rows; i++) {
+      const [lo, hi] = ranges[i];
+      if (!(lo >= 1 && hi <= 90 && hi - lo + 1 >= cols)) { fail(SA.t('tk.bad_range', { x: i + 1 })); return; }
+    }
+  }
+
+  /* real sheet geometry, so a ticket is a known size in the hand */
+  const land = L.orient === 'landscape';
+  const pw = land ? A4.long : A4.short;
+  const ph = land ? A4.short : A4.long;
+  const cellW = (pw - A4.margin * 2) / L.cols;
+  const cellH = (ph - A4.margin * 2) / L.rows;
+
+  const gcols = st === 'housie' ? 9 : cols;
+  const grows = st === 'housie' ? 3 : rows;
+
+  /* type and box sizes follow the room each cell actually has */
+  const inner   = cellW - 6 - 7;                       // minus cell padding and card padding
+  const boxW    = inner / gcols;
+  const numPt   = Math.max(7, Math.min(26, Math.round(boxW * 1.7)));
+  const titlePt = Math.max(7, Math.min(13, Math.round(cellW / 11)));
+  const serPt   = Math.max(6, titlePt - 2);
+  const footPt  = Math.max(5, Math.round(titlePt * 0.55));
+  const boxH    = Math.max(6, (cellH - 24) / grows);
+
+  const tickets = [];
+  for (let i = 0; i < count; i++) {
+    const s = from + i;
+    const grid = st === 'housie'
+      ? SA.tambola.makeTicket(code + '-' + s)
+      : makeSimple(code + '|' + rows + 'x' + cols + '|' + ranges.join(';') + '-' + s, rows, cols, ranges);
+    if (!grid) continue;
+    tickets.push(`
+      <div class="tk">
+        <div class="hd">
+          <img src="${SA.brand.logo}" alt="">
+          <span class="nm" style="font-size:${titlePt}pt">${SA.esc(title)}</span>
+          <span class="sr" style="font-size:${serPt}pt">${serial(s)}</span>
+        </div>
+        <div class="gr" style="grid-template-columns:repeat(${gcols},1fr)">
+          ${grid.map(r => r.map(n => n
+            ? `<div style="font-size:${numPt}pt;min-height:${boxH}mm">${n}</div>`
+            : `<div class="e" style="min-height:${boxH}mm"></div>`).join('')).join('')}
+        </div>
+        <div class="ft" style="font-size:${footPt}pt">${
+          SA.esc(SA.brand.name)} · ${SA.esc(SA.t('host.code_word'))} ${SA.esc(code)}</div>
+      </div>`);
+  }
+
+  /* chunk into pages so every sheet holds exactly `per` tickets */
+  const pages = [];
+  for (let i = 0; i < tickets.length; i += per) {
+    const cells = tickets.slice(i, i + per).map((tk, k) => {
+      const col = k % L.cols, row = Math.floor(k / L.cols);
+      const cls = ['cell'];
+      if (col === L.cols - 1) cls.push('last-col');
+      if (row === L.rows - 1) cls.push('last-row');
+      if (col < L.cols - 1 && row < L.rows - 1) cls.push('cutmark');
+      return `<div class="${cls.join(' ')}">${tk}</div>`;
+    }).join('');
+    pages.push(`<div class="page" style="
+        width:${pw}mm;height:${ph}mm;padding:${A4.margin}mm;
+        grid-template-columns:repeat(${L.cols},1fr);
+        grid-template-rows:repeat(${L.rows},1fr)">${cells}</div>`);
+  }
+
+  /* tell the print dialog what paper this is, before it opens */
+  $('print-style').textContent = `@page{size:A4 ${L.orient};margin:${A4.margin}mm}`;
+
+  generated = tickets.length;
+  $('out').innerHTML = pages.join('');
+  $('btn-print').disabled = false;
+  $('print-controls').style.display = 'block';
+  $('count-note').textContent = SA.t('tk.preview_n', { x: generated }) +
+    ' · ' + SA.t('tk.pages_n', { x: pages.length });
+  SA.toast(SA.t('tk.made_n', { x: generated }));
+  $('out').scrollIntoView({ behavior: 'smooth', block: 'start' });
+};
+
+const doPrint = () => { if (!generated) { fail(SA.t('tk.print_first')); return; } window.print(); };
+$('btn-print').onclick = doPrint;
+$('pc-print').onclick = doPrint;
+$('pc-edit').onclick = () => {
+  $('print-controls').style.display = 'none';
+  document.querySelector('.gen').scrollIntoView({ behavior: 'smooth', block: 'start' });
+};
+</script>
+</body>
+</html>
+
+
+
+
+
+
+
+
+

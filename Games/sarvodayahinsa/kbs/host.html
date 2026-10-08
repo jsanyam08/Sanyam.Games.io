@@ -1,0 +1,2284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MASTER CONTROLLER — कौन बनेगा सिद्धात्मा</title>
+
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Mukta:wght@400;600;700;800&family=Poppins:wght@600;700;800&display=swap');
+
+:root{
+  --bg-base:#070b16; --bg-panel:#0e1526; --bg-sub:#0a1020; --bg-deep:#050811;
+  --bd:#1c2840; --bd-lt:#2b3c60;
+  --gold:#ffcf2e; --gold-dk:#9a6f08; --gold-glow:rgba(255,207,46,.22);
+  --blue:#2f6bff; --green:#10b981; --red:#ef4444; --purple:#c026d3; --purple-dk:#5b0d63;
+  --tx:#f1f5f9; --tx-mut:#8b9ab5;
+}
+html[data-theme="light"]{
+  --bg-base:#eceadf; --bg-panel:#ffffff; --bg-sub:#f6f4ea; --bg-deep:#fffdf7;
+  --bd:#ddd5bc; --bd-lt:#c6bb99;
+  --gold:#8a6206; --gold-dk:#d6b352; --gold-glow:rgba(138,98,6,.18);
+  --blue:#2550cc; --green:#0a8f62; --red:#c8302c; --purple:#9c1fad; --purple-dk:#e9c7f0;
+  --tx:#1a1c22; --tx-mut:#65697a;
+}
+html[data-theme="light"] .b-slate{background:#e7e3d4;border-color:#cfc6a8;color:#1a1c22}
+html[data-theme="light"] .b-slate:hover{background:#dbd5c0}
+html[data-theme="light"] .hdr{background:linear-gradient(180deg,#fffdf6,#f4f0e2)}
+html[data-theme="light"] .ph .tag{background:#e3ecfa;color:#2a4a7a}
+html[data-theme="light"] .lvl-rib{background:#f2ecd8}
+html[data-theme="light"] .qopt{background:#fbf8ef;border-color:#ded5bb}
+html[data-theme="light"] .qopt .lbl{color:#6b6f7a}
+/* these must out-rank the two rules above, or the answer highlight disappears */
+html[data-theme="light"] .qopt.correct{background:#d8f5e8;border:2px solid #0a8f62;color:#064e3b}
+html[data-theme="light"] .qopt.correct .lbl,
+html[data-theme="light"] .qopt.correct .tx{color:#065f46;font-weight:800}
+html[data-theme="light"] .qopt.locked{background:#fdf0c9;border:2px solid #a8790a}
+html[data-theme="light"] .qopt.locked .lbl{color:#7a5504}
+/* pale-on-dark text that turns invisible on paper */
+html[data-theme="light"] .grp-t .n{background:#e3ddc6;color:#4a4e5c}
+html[data-theme="light"] .script-t{color:#2550cc}
+html[data-theme="light"] .warnbox{color:#8c2320}
+html[data-theme="light"] [style*="color:#9dc0ff"]{color:#1f47b8 !important}
+html[data-theme="light"] [style*="color:#fca5a5"]{color:#a8201c !important}
+html[data-theme="light"] [style*="color:#38bdf8"]{color:#0369a1 !important}
+html[data-theme="light"] [style*="color:#f0abfc"]{color:#7a1d88 !important}
+html[data-theme="light"] [style*="color:#93c5fd"]{color:#1f47b8 !important}
+html[data-theme="light"] [style*="color:#64748b"]{color:#5b6070 !important}
+html[data-theme="light"] [style*="color:#5c6b87"]{color:#5b6070 !important}
+html[data-theme="light"] .kbd{opacity:.65}
+html[data-theme="light"] .ll{background:#fbf8ef}
+html[data-theme="light"] .ll:hover{background:#f3eddc}
+html[data-theme="light"] .pbar .track{background:#e7e1cd}
+html[data-theme="light"] .mtabs{background:#f4f0e2}
+html[data-theme="light"] #toast{background:#fffdf7;color:#1a1c22}
+html[data-theme="light"] #gate code,
+html[data-theme="light"] #io-uid{background:#f2ecd8 !important;color:#5c4104 !important}
+html[data-theme="light"] .b-blank{background:#fff;color:var(--red)}
+html[data-theme="light"] .host-preview-box,
+html[data-theme="light"] .qbox{background:#fffdf7}
+html[data-theme="light"] .thud{background:#fbf8ef}
+html[data-theme="light"] .stat{background:#fbf8ef}
+html[data-theme="light"] .log{background:#fbf8ef;color:#4a4e5c}
+html[data-theme="light"] .scriptc{background:rgba(47,107,255,.07)}
+html[data-theme="light"] .script-t{color:#2550cc}
+html[data-theme="light"] [style*="background:#3f0a46"]{background:#f3d9f8 !important;color:#7a1d88 !important}
+html[data-theme="light"] [style*="background:var(--bg-deep)"]{background:#fbf8ef !important}
+html[data-theme="light"] .b-gold{background:#d6b352;color:#221a02}
+html[data-theme="light"] .b-purple{background:#e9c7f0;color:#3d0745;border-color:#9c1fad}
+html[data-theme="light"] .log{color:#4a4e5c}
+html[data-theme="light"] .ll{background:#fffdf7}
+html[data-theme="light"] #toast{background:#fffdf7;color:#1a1c22}
+html[data-theme="light"] .b-blank{background:#fff;color:var(--red)}
+html[data-theme="light"] #gate{background:var(--bg-base)}
+*{box-sizing:border-box;margin:0;padding:0;font-family:'Mukta',sans-serif}
+body{background:var(--bg-base);color:var(--tx);height:100vh;display:flex;flex-direction:column;overflow:hidden;font-size:14px}
+button{border:none;border-radius:7px;padding:9px 12px;font-size:.9rem;font-weight:700;cursor:pointer;
+  transition:.13s;color:#fff;display:flex;align-items:center;justify-content:center;gap:6px;text-align:center;line-height:1.25}
+button:hover:not(:disabled){filter:brightness(1.15);transform:translateY(-1px)}
+button:active:not(:disabled){transform:scale(.97)}
+button:disabled{opacity:.3;filter:grayscale(1);cursor:not-allowed;transform:none}
+input,select,textarea{background:var(--bg-sub);border:1px solid var(--bd);border-radius:6px;padding:9px 11px;
+  color:var(--tx);font-size:.92rem;outline:none;width:100%}
+input:focus,select:focus,textarea:focus{border-color:var(--gold)}
+select option{background:var(--bg-sub);color:var(--tx)}
+input::placeholder,textarea::placeholder{color:var(--tx-mut);opacity:1}
+::-webkit-scrollbar{width:7px;height:7px}
+::-webkit-scrollbar-thumb{background:var(--bd-lt);border-radius:4px}
+
+/* HEADER */
+.hdr{background:linear-gradient(180deg,#121b33,#0a1020);border-bottom:2px solid var(--bd);
+  padding:8px 18px;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;z-index:20}
+.brand{display:flex;align-items:center;gap:12px}
+.brand h1{font-size:1.15rem;color:var(--gold);font-weight:800;letter-spacing:.3px}
+.live-badge{background:rgba(239,68,68,.15);border:1px solid var(--red);color:var(--red);font-size:.68rem;
+  font-weight:800;padding:2px 8px;border-radius:4px;letter-spacing:1px;display:flex;align-items:center;gap:6px}
+.pulse{width:6px;height:6px;border-radius:50%;background:var(--red);animation:pulse 1s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.25}}
+.hdr-tools{display:flex;align-items:center;gap:10px}
+.chip{display:flex;align-items:center;gap:7px;background:var(--bg-sub);padding:5px 12px;border-radius:20px;
+  border:1px solid var(--bd);font-size:.8rem;font-weight:700;white-space:nowrap}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--red);box-shadow:0 0 7px var(--red)}
+.dot.ok{background:var(--green);box-shadow:0 0 7px var(--green)}
+.btn-hdr{background:var(--bg-sub);border:1px solid var(--gold-dk);color:var(--gold);padding:6px 13px;
+  border-radius:7px;font-weight:700;font-size:.85rem}
+.btn-hdr:hover{background:var(--gold-dk);color:#000}
+
+/* WORKSPACE */
+.ws{display:grid;grid-template-columns:420px 1fr 1fr;flex:1;min-height:0;gap:12px;padding:12px}
+.col{background:var(--bg-panel);border:1px solid var(--bd);border-radius:11px;display:flex;flex-direction:column;overflow:hidden}
+.col.mob{border-color:rgba(192,38,211,.3)}
+.col.mob .ph{color:var(--purple);border-color:rgba(192,38,211,.3)}
+.ph{background:var(--bg-sub);border-bottom:1px solid var(--bd);padding:9px 14px;font-size:.82rem;font-weight:800;
+  color:var(--tx-mut);text-transform:uppercase;letter-spacing:.9px;display:flex;justify-content:space-between;align-items:center;flex-shrink:0}
+.ph .tag{font-size:.68rem;padding:2px 7px;border-radius:4px;background:#1e2d4d;color:#9bb5e8;letter-spacing:.5px}
+.body{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:11px}
+
+/* GROUPS */
+.grp{background:var(--bg-sub);border:1px solid var(--bd);border-radius:9px;padding:11px;display:flex;flex-direction:column;gap:9px}
+.grp-t{font-size:.72rem;font-weight:800;color:var(--tx-mut);text-transform:uppercase;letter-spacing:.8px;
+  display:flex;justify-content:space-between;align-items:center;gap:8px}
+.grp-t .n{background:var(--bd);color:#c3d2ea;font-size:.68rem;padding:1px 6px;border-radius:4px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+.g3{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}
+.g4{display:grid;grid-template-columns:repeat(4,1fr);gap:7px}
+
+.b-slate{background:#1b2740;border:1px solid #2f4470}
+.b-slate:hover{background:#26375a}
+.b-blue{background:var(--blue)}
+.b-green{background:var(--green)}
+.b-red{background:var(--red)}
+.b-gold{background:var(--gold-dk);color:#ffe89a}
+.b-gold:hover{background:var(--gold);color:#000}
+.b-purple{background:var(--purple-dk);border:1px solid var(--purple)}
+.b-purple:hover{background:var(--purple)}
+.b-big{padding:12px;font-size:.98rem}
+.b-blank{background:#000;border:2px solid var(--red);color:var(--red);padding:12px;font-size:.95rem;
+  font-weight:800;letter-spacing:.8px;box-shadow:0 0 12px rgba(239,68,68,.18)}
+.b-blank:hover{background:var(--red);color:#fff}
+button.on{outline:2px solid #fff;box-shadow:0 0 12px var(--gold-glow)}
+.kbd{font-size:.62rem;opacity:.5;font-weight:800;border:1px solid currentColor;border-radius:3px;padding:0 3px;margin-left:2px}
+
+/* PLAYER CARD */
+.pcard{background:var(--bg-sub);border:1px solid var(--bd);border-radius:9px;padding:11px;display:flex;flex-direction:column;gap:9px}
+.prow{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.pname{font-size:1.3rem;font-weight:800;color:var(--tx);line-height:1.1}
+.pcity{font-size:.85rem;color:var(--gold);font-weight:700;white-space:nowrap}
+.lvl-rib{display:flex;justify-content:space-between;align-items:center;background:#16223c;padding:7px 11px;
+  border-radius:6px;border-left:3px solid var(--gold);gap:8px}
+.lvl-n{font-size:.98rem;font-weight:800;color:var(--tx)}
+.lvl-q{font-size:.76rem;color:var(--tx-mut);font-weight:700}
+.ms{font-size:.74rem;color:var(--green);font-weight:800;text-align:right;line-height:1.35}
+
+/* QUESTION PREVIEW */
+.qbox{background:var(--bg-deep);border:1px solid var(--bd);border-radius:9px;padding:14px;display:flex;flex-direction:column;gap:11px}
+.qtext{font-size:1.22rem;font-weight:800;color:var(--tx);line-height:1.35}
+.qgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.qopt{background:#121b30;border:1px solid #22314f;border-radius:7px;padding:9px 11px;font-size:.98rem;
+  font-weight:600;display:flex;justify-content:space-between;align-items:center;gap:6px;transition:.2s}
+.qopt .lbl{font-weight:800;margin-right:5px;color:var(--tx-mut)}
+.qopt.correct{border:2px solid var(--green);background:rgba(16,185,129,.09)}
+/* unmistakable at a glance, in either theme */
+.qopt.correct::after{content:'✓ ANSWER';font-size:.6rem;font-weight:800;color:var(--green);
+  letter-spacing:.6px;flex-shrink:0;margin-left:auto;padding-left:6px}
+.qopt.correct .lbl{color:var(--green)}
+.qopt.gone{opacity:.28;text-decoration:line-through}
+.qopt.locked{border:2px solid var(--gold);background:rgba(255,207,46,.1)}
+.tag5050{font-size:.64rem;color:#fb7185;font-weight:800;white-space:nowrap}
+.scriptc{background:rgba(47,107,255,.08);border:1px solid rgba(47,107,255,.28);border-left:4px solid var(--blue);
+  border-radius:0 7px 7px 0;padding:11px}
+.script-t{font-size:.72rem;font-weight:800;color:#7ba6ff;letter-spacing:.5px;margin-bottom:5px}
+.script-b{font-size:.95rem;color:var(--tx);opacity:.92;line-height:1.5}
+
+/* TIMER */
+.thud{display:flex;justify-content:space-between;align-items:center;background:var(--bg-deep);padding:9px 12px;
+  border-radius:8px;border:1px solid var(--bd);gap:10px}
+.tnum{font-family:'Poppins',monospace;font-size:1.8rem;font-weight:800;color:var(--green);
+  text-shadow:0 0 10px rgba(16,185,129,.4);letter-spacing:1px;line-height:1}
+.tnum.warn{color:var(--gold);text-shadow:0 0 10px var(--gold-glow)}
+.tnum.crit{color:var(--red);text-shadow:0 0 10px rgba(239,68,68,.5);animation:pulse .6s infinite}
+.tdesc{font-size:.74rem;color:var(--tx-mut);line-height:1.4}
+
+/* LIFELINES */
+.ll{background:var(--bg-deep);border:1px solid var(--bd);border-radius:7px;padding:7px 4px;display:flex;
+  flex-direction:column;align-items:center;gap:3px;cursor:pointer;transition:.18s;user-select:none}
+.ll:hover{border-color:var(--blue);background:#0d1628}
+.ll-n{font-size:.88rem;font-weight:800}
+.ll-s{font-size:.64rem;font-weight:800;color:var(--green);letter-spacing:.3px}
+.ll.used{opacity:.3;filter:grayscale(1);pointer-events:none;border-color:var(--red)}
+.ll.used .ll-s{color:var(--red)}
+
+/* STATS */
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}
+.stat{background:var(--bg-deep);border:1px solid var(--bd);border-radius:7px;padding:7px;text-align:center}
+.stat .v{font-size:1.25rem;font-weight:800;color:var(--gold);font-family:'Poppins',sans-serif;line-height:1.1}
+.stat .l{font-size:.62rem;color:var(--tx-mut);text-transform:uppercase;letter-spacing:.5px;margin-top:2px}
+
+/* POLL BARS */
+.pbar{display:flex;align-items:center;gap:7px;font-size:.82rem;font-weight:700}
+.pbar .k{width:16px;color:var(--gold);font-weight:800}
+.pbar .track{flex:1;height:16px;background:#0c1426;border-radius:4px;overflow:hidden;border:1px solid var(--bd)}
+.pbar .track{display:block}
+.pbar .fill{display:block;height:100%;min-width:2px;background:linear-gradient(90deg,var(--blue),#63a4ff);transition:width .4s}
+.pbar .pct{width:42px;text-align:right;color:#cbd8ec}
+
+/* LOG */
+.log{background:var(--bg-deep);border:1px solid var(--bd);border-radius:7px;padding:8px;font-size:.74rem;
+  color:var(--tx-mut);max-height:110px;overflow-y:auto;font-family:monospace;line-height:1.6}
+.log b{color:var(--gold);font-weight:700}
+
+/* MODAL */
+.ov{position:fixed;inset:0;background:rgba(0,0,0,.82);backdrop-filter:blur(7px);display:none;
+  align-items:center;justify-content:center;z-index:1000;padding:20px}
+.ov.open{display:flex}
+.mcard{background:var(--bg-panel);border:2px solid var(--bd);border-radius:13px;width:min(980px,100%);
+  max-height:88vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 25px 60px rgba(0,0,0,.9)}
+.mhead{background:var(--bg-sub);border-bottom:1px solid var(--bd);padding:13px 20px;display:flex;
+  justify-content:space-between;align-items:center}
+.mhead h2{font-size:1.15rem;color:var(--gold);font-weight:800}
+.mclose{background:transparent;color:var(--tx-mut);font-size:1.4rem;padding:2px 8px}
+.mtabs{display:flex;background:#080e1c;border-bottom:1px solid var(--bd);padding:0 12px;flex-wrap:wrap}
+.tb{background:transparent;border-bottom:3px solid transparent;border-radius:0;padding:11px 17px;
+  font-size:.88rem;font-weight:700;color:var(--tx-mut)}
+.tb.active{color:var(--gold);border-bottom-color:var(--gold)}
+.mbody{flex:1;overflow-y:auto;padding:20px}
+.frow{display:flex;gap:11px;margin-bottom:12px}
+.fg{flex:1;display:flex;flex-direction:column;gap:5px}
+.fg label{font-size:.78rem;font-weight:700;color:var(--tx-mut)}
+.qt{width:100%;border-collapse:collapse;margin-top:12px;font-size:.84rem}
+.qt th,.qt td{padding:8px 10px;text-align:left;border-bottom:1px solid var(--bd);vertical-align:top}
+.qt th{background:var(--bg-sub);color:var(--tx-mut);font-weight:700;position:sticky;top:0}
+.card-form{background:var(--bg-sub);padding:14px;border-radius:8px;border:1px solid var(--bd);margin-bottom:16px}
+.card-form h4{margin-bottom:10px;color:var(--gold);font-size:.95rem}
+.hint{font-size:.76rem;color:var(--tx-mut);line-height:1.5}
+.warnbox{background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.35);border-left:4px solid var(--red);
+  border-radius:0 7px 7px 0;padding:10px 12px;font-size:.82rem;color:#fca5a5;line-height:1.5}
+
+/* TOAST */
+#toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%) translateY(160%);background:#0d1628;
+  border:1px solid var(--gold-dk);border-left:4px solid var(--gold);color:#fff;padding:11px 20px;border-radius:8px;
+  font-weight:700;font-size:.9rem;z-index:3000;transition:transform .28s,opacity .28s;
+  box-shadow:0 10px 30px rgba(0,0,0,.6);max-width:80vw;opacity:0;visibility:hidden;pointer-events:none}
+#toast.show{transform:translateX(-50%) translateY(0);opacity:1;visibility:visible}
+#toast.err{border-color:var(--red);border-left-color:var(--red)}
+
+/* AUTH GATE */
+#gate{position:fixed;inset:0;background:var(--bg-base);z-index:5000;display:flex;align-items:center;
+  justify-content:center;flex-direction:column;gap:14px;padding:30px;text-align:center}
+#gate h2{color:var(--gold);font-size:1.4rem}
+#gate .sp{width:34px;height:34px;border:3px solid var(--bd);border-top-color:var(--gold);border-radius:50%;
+  animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+#gate code{background:#0d1628;padding:3px 8px;border-radius:5px;color:var(--gold);
+  font-family:monospace;user-select:all;font-size:.95rem;word-break:break-all;display:inline-block}
+</style>
+</head>
+<body>
+
+<div id="gate">
+  <div id="gate-spin" class="sp"></div>
+  <h2 id="gate-title">Connecting…</h2>
+  <div class="hint" id="gate-msg" style="max-width:600px">Checking your session.</div>
+
+  <form id="gate-form" style="display:none;flex-direction:column;gap:11px;width:min(360px,90vw);margin-top:6px"
+        onsubmit="hostLogin(event)">
+    <input type="email" id="lg-email" placeholder="Host email" autocomplete="username" required>
+    <input type="password" id="lg-pass" placeholder="Password" autocomplete="current-password" required>
+    <button type="submit" class="b-gold" style="padding:12px" id="lg-btn">🔓 Sign in as Host</button>
+    <div class="hint" style="text-align:center;font-size:.78rem;line-height:1.6">
+      Accounts are created and reset by the show owner in the Firebase console.<br>
+      Forgot your password? Ask the owner to reset it.
+    </div>
+    <div id="device-login" style="border-top:1px solid var(--bd);margin-top:6px;padding-top:12px;display:none">
+      <button type="button" class="b-slate" style="width:100%;font-size:.85rem" onclick="deviceLogin()">
+        💻 Continue on this device (owner's laptop)</button>
+      <div class="hint" style="text-align:center;font-size:.72rem;margin-top:7px">
+        Local server only. On the web, always sign in with your email.
+      </div>
+    </div>
+  </form>
+</div>
+
+<header class="hdr">
+  <div class="brand">
+    <h1>🎙️ MASTER CONTROLLER — कौन बनेगा सिद्धात्मा</h1>
+    <div class="live-badge"><div class="pulse"></div> LIVE</div>
+  </div>
+  <div class="hdr-tools">
+    <div class="chip" style="border-color:var(--gold-dk)">
+      <span style="color:var(--tx-mut);font-size:.72rem;letter-spacing:.5px">ROOM</span>
+      <select id="sel-room" onchange="switchRoom(this.value)"
+              style="width:auto;padding:2px 6px;font-size:.85rem;font-weight:800;color:var(--gold);
+                     background:transparent;border:none"></select>
+      <button class="btn-hdr" style="padding:2px 8px;font-size:.75rem" onclick="createRoom()">＋ New</button>
+    </div>
+    <div class="chip"><span id="aud-count" style="color:var(--purple);font-weight:800">0</span> phones</div>
+    <div class="chip"><div class="dot" id="cdot"></div><span id="ctext">Connecting…</span></div>
+    <button class="btn-hdr" style="border-color:var(--blue);color:#9dc0ff" onclick="openProjector()">🖥️ Open Projector</button>
+    <button class="btn-hdr" id="btn-theme" onclick="toggleTheme()">🌙 Dark</button>
+    <button class="btn-hdr" style="border-color:var(--red);color:#fca5a5" onclick="runDiagnostics()">🩺 Diagnose</button>
+    <button class="btn-hdr" onclick="openHelp()">⌨️ Shortcuts</button>
+    <button class="btn-hdr" onclick="openCMS()">⚙️ Settings &amp; CMS</button>
+  </div>
+</header>
+
+<div class="ws">
+
+  <!-- ============ LEFT: MONITOR ============ -->
+  <div class="col">
+    <div class="ph"><span>Contestant &amp; Script Monitor</span><span style="color:var(--gold)">Safe: L7 · L12 · L14</span></div>
+    <div class="body">
+
+      <div class="pcard">
+        <div class="prow">
+          <div class="pname" id="v-name">—</div>
+          <div class="pcity" id="v-city"></div>
+        </div>
+        <div class="lvl-rib">
+          <div>
+            <div class="lvl-n" id="v-lvl">Level 1</div>
+            <div class="lvl-q" id="v-prize">Question 1 of 14</div>
+          </div>
+          <div class="ms" id="v-safe">—</div>
+        </div>
+        <div class="g2">
+          <button class="b-slate" onclick="changeLevel(-1)">◀ Level Down</button>
+          <button class="b-slate" onclick="changeLevel(1)">Level Up ▶</button>
+        </div>
+      </div>
+
+      <div class="qbox">
+        <div class="qtext" id="v-q">No question loaded</div>
+        <div class="qgrid">
+          <div class="qopt" id="v-A"><span><span class="lbl">A:</span> <span class="tx">—</span></span><span class="tag5050"></span></div>
+          <div class="qopt" id="v-B"><span><span class="lbl">B:</span> <span class="tx">—</span></span><span class="tag5050"></span></div>
+          <div class="qopt" id="v-C"><span><span class="lbl">C:</span> <span class="tx">—</span></span><span class="tag5050"></span></div>
+          <div class="qopt" id="v-D"><span><span class="lbl">D:</span> <span class="tx">—</span></span><span class="tag5050"></span></div>
+        </div>
+        <div class="scriptc">
+          <div class="script-t">📜 HOST SCRIPT (READ AFTER REVEAL)</div>
+          <div class="script-b" id="v-script">—</div>
+        </div>
+      </div>
+
+      <div class="grp">
+        <div class="grp-t"><span>Load Question for Level <span id="v-lvlnum">1</span></span>
+          <span class="n" id="v-pool">0 left</span></div>
+        <button class="b-blue b-big" onclick="loadRandomQuestion()">🎲 Load Random Unused Question <span class="kbd">L</span></button>
+        <select id="pick-q" onchange="loadPickedQuestion(this.value)"><option value="">— or pick manually —</option></select>
+        <div class="g2">
+          <button class="b-slate" onclick="markUsed(true)">✔ Mark Used</button>
+          <button class="b-slate" onclick="markUsed(false)">↺ Mark Unused</button>
+        </div>
+      </div>
+
+      <div class="grp">
+        <div class="grp-t"><span>Contestant Details</span><span class="n" id="fff-win-n">0 from FFF</span></div>
+        <select id="sel-fff-winner"><option value="">— pick from last FFF result —</option></select>
+        <button class="b-purple" style="font-size:.82rem" onclick="useFFFWinner()">⬇️ Use this FFF player as contestant</button>
+        <div class="g2">
+          <input type="text" id="in-name" placeholder="Contestant name">
+          <input type="number" id="in-age" placeholder="Age" min="3" max="120">
+        </div>
+        <input type="text" id="in-city" placeholder="City">
+        <button class="b-slate" onclick="savePlayer()">💾 Update Contestant</button>
+        <button class="b-red" onclick="newContestant()">🔄 New Contestant (reset lifelines &amp; level)</button>
+      </div>
+
+      <div class="grp">
+        <div class="grp-t">Activity Log</div>
+        <div class="log" id="log"></div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ============ MIDDLE: PROJECTOR ============ -->
+  <div class="col">
+    <div class="ph"><span>A. Projector Screen</span><span class="tag">MAIN SCREEN</span></div>
+    <div class="body">
+
+      <div class="grp">
+        <div class="grp-t">Stage / Screen State</div>
+        <div class="g3">
+          <button class="b-slate" onclick="setScreen('idle')">🏠 Idle Logo</button>
+          <button class="b-slate" onclick="setScreen('ladder')">🪜 Ladder <span class="kbd">6</span></button>
+          <button class="b-slate" onclick="setScreen('explanation')">📖 Explain <span class="kbd">7</span></button>
+        </div>
+        <div class="g2">
+          <button class="b-slate" style="color:var(--green)" onclick="setScreen('certificate')">🏆 Certificate</button>
+          <button class="b-slate" style="color:var(--gold)" onclick="playAudio('theme')">🎵 Theme Song</button>
+        </div>
+        <div class="g3">
+          <button class="b-slate" style="font-size:.78rem" onclick="playAudio('suspense')">🎼 Suspense</button>
+          <button class="b-slate" style="font-size:.78rem" onclick="playAudio('lock')">🔒 Lock SFX</button>
+          <button class="b-slate" style="font-size:.78rem;color:var(--red)" onclick="playAudio('stop')">⏹ Stop Audio</button>
+        </div>
+        <button class="b-slate" id="btn-mute" style="border-color:var(--red);color:var(--red)" onclick="toggleMute()">
+          🔇 MUTE — no sound will play</button>
+      </div>
+
+      <div class="grp">
+        <div class="grp-t">Question Sequence</div>
+        <button class="b-blue b-big" onclick="showQuestion()">1. 🚀 Show Question (options hidden) <span class="kbd">1</span></button>
+        <div class="g2">
+          <button class="b-slate" style="border-color:#3b82f6;color:#9dc0ff" onclick="revealOptions(true)">2. 👁️ Reveal Options <span class="kbd">2</span></button>
+          <button class="b-slate" onclick="revealOptions(false)">Hide Options</button>
+        </div>
+        <div class="grp-t" style="margin-top:2px">3. Lock Contestant's Answer</div>
+        <div class="g4">
+          <button class="b-gold" onclick="lockAnswer('A')">Lock A <span class="kbd">A</span></button>
+          <button class="b-gold" onclick="lockAnswer('B')">Lock B <span class="kbd">B</span></button>
+          <button class="b-gold" onclick="lockAnswer('C')">Lock C <span class="kbd">C</span></button>
+          <button class="b-gold" onclick="lockAnswer('D')">Lock D <span class="kbd">D</span></button>
+        </div>
+        <button class="b-slate" style="font-size:.8rem" onclick="lockAnswer(null)">↺ Clear Lock</button>
+      </div>
+
+      <div class="grp">
+        <div class="grp-t">4. Outcome</div>
+        <div class="g3">
+          <button class="b-green" onclick="reveal('correct')">✅ Correct <span class="kbd">3</span></button>
+          <button class="b-red" onclick="reveal('wrong')">❌ Wrong <span class="kbd">4</span></button>
+          <button class="b-slate" style="color:var(--gold)" onclick="walkAway()">🚶 Walk Away</button>
+        </div>
+        <button class="b-slate" style="font-size:.8rem" onclick="reveal('none')">↺ Clear Result</button>
+      </div>
+
+      <div class="grp">
+        <div class="grp-t"><span>Lifelines</span><button class="b-slate" style="padding:2px 8px;font-size:.68rem" onclick="resetLifelines()">Reset All</button></div>
+        <div class="g4">
+          <div class="ll" id="ll-5050" onclick="useLifeline('5050')"><span class="ll-n">50:50</span><span class="ll-s">Ready</span></div>
+          <div class="ll" id="ll-poll" onclick="useLifeline('poll')"><span class="ll-n">📊 Poll</span><span class="ll-s">Ready</span></div>
+          <div class="ll" id="ll-expert" onclick="useLifeline('expert')"><span class="ll-n">💡 Expert</span><span class="ll-s">Ready</span></div>
+          <div class="ll" id="ll-call" onclick="useLifeline('call')"><span class="ll-n">📞 Call</span><span class="ll-s">Ready</span></div>
+        </div>
+      </div>
+
+      <div class="grp">
+        <div class="grp-t"><span>Timer</span><span class="n" id="t-preset">30s</span></div>
+        <div class="thud">
+          <div>
+            <div class="tdesc" id="t-label">Ready</div>
+            <div style="font-size:.68rem;color:#5c6b87">Q1–7 = 30s · Q8–12 = 60s · Q13–14 = 120s</div>
+          </div>
+          <div class="tnum" id="t-num">00:30</div>
+        </div>
+        <div class="g3">
+          <button class="b-green" onclick="timerStart()">▶ Start <span class="kbd">5</span></button>
+          <button class="b-slate" style="color:var(--gold)" onclick="timerPause()">⏸ Pause</button>
+          <button class="b-slate" onclick="timerReset()">🔄 Reset</button>
+        </div>
+        <div class="g3">
+          <button class="b-slate" style="font-size:.76rem" onclick="timerCustom(30,'Poll Timer')">Poll 30s</button>
+          <button class="b-slate" style="font-size:.76rem" onclick="timerCustom(60,'Phone a Friend')">Call 60s</button>
+          <button class="b-slate" style="font-size:.76rem;color:var(--red)" onclick="timerStop()">⏹ Stop</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ============ RIGHT: MOBILE ============ -->
+  <div class="col mob">
+    <div class="ph"><span>B. Mobile Screens</span><span class="tag" style="background:#3f0a46;color:#f0abfc">AUDIENCE PHONES</span></div>
+    <div class="body">
+
+      <button class="b-blank" onclick="mobileMode('blank')">⬛ BLANK ALL AUDIENCE SCREENS <span class="kbd">0</span></button>
+
+      <div class="grp">
+        <div class="grp-t"><span>📱 Audience Join Link</span><span class="n" id="join-live">0 joined</span></div>
+        <input type="text" id="in-joinurl" placeholder="https://kounbanegasiddhatma.web.app">
+        <div class="g2">
+          <button class="b-gold b-big" onclick="showJoinQR()">📺 Show QR on Projector</button>
+          <button class="b-slate" onclick="copyJoinLink()">🔗 Copy Link</button>
+        </div>
+        <div class="hint" style="font-size:.75rem">Put this up before the show while the audience takes their seats.</div>
+      </div>
+
+      <div class="stats">
+        <div class="stat"><div class="v" id="s-joined">0</div><div class="l">Joined</div></div>
+        <div class="stat"><div class="v" id="s-resp">0</div><div class="l">Responses</div></div>
+        <div class="stat"><div class="v" id="s-mode">blank</div><div class="l">Mode</div></div>
+      </div>
+
+      <div class="grp">
+        <div class="grp-t"><span>⚡ Fastest Finger First</span><span class="n" id="fff-n">0 saved</span></div>
+        <select id="sel-fff"><option value="">— no FFF questions —</option></select>
+        <div class="g2">
+          <button class="b-purple" onclick="fffStart()">▶ Send FFF to Phones</button>
+          <button class="b-slate" onclick="fffClose()">⏹ Close Entries</button>
+        </div>
+        <div class="g2">
+          <button class="b-slate" onclick="fffReveal()">👁 Reveal Correct Order</button>
+          <button class="b-slate" style="color:var(--gold)" onclick="fffLeaderboard()">🏆 Show Top 10</button>
+        </div>
+        <div class="hint" id="fff-info">No round running.</div>
+      </div>
+
+      <div class="grp">
+        <div class="grp-t"><span>📊 Audience Poll</span>
+          <span style="display:flex;gap:4px">
+            <button class="b-slate" id="pm-auto" style="padding:2px 9px;font-size:.68rem" onclick="setPollMode('auto')">AUTO</button>
+            <button class="b-slate" id="pm-manual" style="padding:2px 9px;font-size:.68rem" onclick="setPollMode('manual')">MANUAL</button>
+          </span>
+        </div>
+        <div class="hint" id="poll-mode-hint" style="font-size:.72rem"></div>
+        <button class="b-purple b-big" onclick="pollOpen()">📲 Open Voting (30s)</button>
+        <div id="poll-manual-btns" style="display:none;flex-direction:column;gap:7px">
+          <button class="b-slate" onclick="pollClose()">📉 Close Voting &amp; Show Bars Full Screen</button>
+          <div class="g2">
+            <button class="b-slate" style="color:var(--gold)" onclick="pollShowInline()">📌 Graph Beside Question</button>
+            <button class="b-slate" onclick="pollHideInline()">✕ Hide Graph</button>
+          </div>
+        </div>
+        <div id="poll-res" style="display:flex;flex-direction:column;gap:5px"></div>
+        <div class="g2">
+          <button class="b-slate" style="font-size:.76rem" onclick="pushPollToProjector()">📺 Push Bars</button>
+          <button class="b-slate" style="font-size:.76rem;color:var(--gold)" onclick="pollShowInline()">📌 Pin Beside Question</button>
+        </div>
+      </div>
+
+      <div class="grp">
+        <div class="grp-t"><span>📢 Audience Question</span><span class="n" id="aud-n">0 saved</span></div>
+        <select id="sel-aud"><option value="">— no audience questions —</option></select>
+        <div class="g2">
+          <button class="b-purple" onclick="audQSend()">📤 Send to Phones</button>
+          <button class="b-slate" onclick="audQReveal()">✅ Reveal Answer (+10 pts)</button>
+        </div>
+        <div class="hint" id="aud-info">No question sent.</div>
+      </div>
+
+      <div class="grp">
+        <div class="grp-t">🎖️ Overall Audience Leaderboard</div>
+        <button class="b-slate" style="color:#38bdf8;border-color:#0284c7;padding:11px" onclick="audLeaderboard()">
+          📊 Broadcast Top 10 Leaderboard</button>
+        <button class="b-red" style="font-size:.78rem" onclick="resetScores()">🗑 Reset All Audience Scores</button>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ============ CMS MODAL ============ -->
+<div class="ov" id="cms">
+  <div class="mcard">
+    <div class="mhead">
+      <h2>⚙️ Content Management — Question Banks</h2>
+      <button class="mclose" onclick="closeCMS()">✕</button>
+    </div>
+    <div class="mtabs">
+      <button class="tb active" onclick="tab('t-lvl',this)">Question Bank by Level</button>
+      <button class="tb" onclick="tab('t-aud',this)">Audience Questions</button>
+      <button class="tb" onclick="tab('t-fff',this)">FFF Ordering</button>
+      <button class="tb" onclick="tab('t-aud-mgmt',this)">Audience &amp; Access</button>
+      <button class="tb" onclick="tab('t-io',this)">Backup / Restore</button>
+    </div>
+    <div class="mbody">
+
+      <!-- LEVEL BANK -->
+      <div id="t-lvl" class="pane">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;gap:12px;flex-wrap:wrap">
+          <div style="display:flex;gap:9px;align-items:center;flex:1;min-width:280px">
+            <label style="font-weight:700;white-space:nowrap">Level:</label>
+            <select id="cms-lvl" onchange="renderLevelBank()">
+              <option value="1">Level 1: दर्शन प्रतिमा</option>
+              <option value="2">Level 2: व्रत प्रतिमा</option>
+              <option value="3">Level 3: सामायिक प्रतिमा</option>
+              <option value="4">Level 4: प्रोषध प्रतिमा</option>
+              <option value="5">Level 5: सचित्त त्याग प्रतिमा</option>
+              <option value="6">Level 6: रात्रि भुक्ति त्याग प्रतिमा</option>
+              <option value="7">Level 7: ब्रह्मचर्य प्रतिमा ⭐ SAFE</option>
+              <option value="8">Level 8: आरम्भ त्याग प्रतिमा</option>
+              <option value="9">Level 9: परिग्रह त्याग प्रतिमा</option>
+              <option value="10">Level 10: अनुमति त्याग प्रतिमा</option>
+              <option value="11">Level 11: उद्दिष्ट त्याग प्रतिमा</option>
+              <option value="12">Level 12: मुनि दीक्षा ⭐ SAFE</option>
+              <option value="13">Level 13: केवलज्ञान</option>
+              <option value="14">Level 14: सिद्ध पद 🏆 SAFE</option>
+            </select>
+          </div>
+          <button class="b-red" style="font-size:.82rem" onclick="resetAllPools()">🔄 Reset Used Pool — ALL 14 LEVELS</button>
+        </div>
+
+        <div class="card-form">
+          <h4 id="lvl-form-title">Add New Question</h4>
+          <div class="fg" style="margin-bottom:10px">
+            <label>Question Text:</label>
+            <input type="text" id="q-text" placeholder="जीव के कितने प्रकार हैं?">
+          </div>
+          <div class="frow">
+            <div class="fg"><label>Option A:</label><input type="text" id="q-a" placeholder="दो"></div>
+            <div class="fg"><label>Option B:</label><input type="text" id="q-b" placeholder="तीन"></div>
+          </div>
+          <div class="frow">
+            <div class="fg"><label>Option C:</label><input type="text" id="q-c" placeholder="चार"></div>
+            <div class="fg"><label>Option D:</label><input type="text" id="q-d" placeholder="पाँच"></div>
+          </div>
+          <div class="frow">
+            <div class="fg"><label>Correct Answer:</label>
+              <select id="q-correct"><option>A</option><option>B</option><option>C</option><option>D</option></select></div>
+            <div class="fg"><label>50:50 — which 2 wrong options to hide:</label>
+              <input type="text" id="q-5050" placeholder="B, C"></div>
+          </div>
+          <div class="fg" style="margin-bottom:11px">
+            <label>Host Explanation / Script:</label>
+            <textarea id="q-exp" rows="2" placeholder="जिनागम में दो प्रकार के जीव कहे गये हैं…"></textarea>
+          </div>
+          <div class="g2" style="max-width:380px">
+            <button class="b-green" onclick="saveLevelQ()" id="q-save">💾 Add Question</button>
+            <button class="b-slate" onclick="clearLevelForm()">✕ Clear / Cancel Edit</button>
+          </div>
+        </div>
+
+        <h4>Pool for this level:</h4>
+        <table class="qt"><thead><tr><th>#</th><th>Question</th><th>Correct</th><th>50:50</th><th>Status</th><th>Actions</th></tr></thead>
+          <tbody id="tb-lvl"></tbody></table>
+      </div>
+
+      <!-- AUDIENCE BANK -->
+      <div id="t-aud" class="pane" style="display:none">
+        <div class="card-form">
+          <h4 id="aud-form-title">Add New Audience Question</h4>
+          <div class="fg" style="margin-bottom:10px">
+            <label>Question Text:</label>
+            <input type="text" id="a-text" placeholder="प्रथम तीर्थंकर कौन हैं?">
+          </div>
+          <div class="frow">
+            <div class="fg"><label>Option A:</label><input type="text" id="a-a" placeholder="ऋषभदेव"></div>
+            <div class="fg"><label>Option B:</label><input type="text" id="a-b" placeholder="महावीर"></div>
+          </div>
+          <div class="frow">
+            <div class="fg"><label>Option C:</label><input type="text" id="a-c" placeholder="पार्श्वनाथ"></div>
+            <div class="fg"><label>Option D:</label><input type="text" id="a-d" placeholder="नेमिनाथ"></div>
+          </div>
+          <div class="frow">
+            <div class="fg" style="max-width:190px"><label>Correct Answer:</label>
+              <select id="a-correct"><option>A</option><option>B</option><option>C</option><option>D</option></select></div>
+          </div>
+          <div class="fg" style="margin-bottom:11px">
+            <label>Explanation (shown on phones after reveal):</label>
+            <textarea id="a-exp" rows="2" placeholder="व्याख्या…"></textarea>
+          </div>
+          <div class="g2" style="max-width:380px">
+            <button class="b-green" onclick="saveAudQ()" id="a-save">💾 Add to Audience Bank</button>
+            <button class="b-slate" onclick="clearAudForm()">✕ Clear / Cancel Edit</button>
+          </div>
+        </div>
+        <h4>Audience question bank:</h4>
+        <table class="qt"><thead><tr><th>#</th><th>Question</th><th>Options</th><th>Correct</th><th>Actions</th></tr></thead>
+          <tbody id="tb-aud"></tbody></table>
+      </div>
+
+      <!-- FFF BANK -->
+      <div id="t-fff" class="pane" style="display:none">
+        <div class="card-form">
+          <h4 id="fff-form-title">Add New FFF Ordering Question</h4>
+          <div class="fg" style="margin-bottom:10px">
+            <label>Question Text:</label>
+            <input type="text" id="f-text" placeholder="चारों कालों को सही क्रम में लगाएँ">
+          </div>
+          <div class="fg" style="margin-bottom:10px">
+            <label style="color:var(--gold)">⚠️ Type the items in the CORRECT order (top = first). Phones receive them shuffled.</label>
+            <div id="f-items" style="display:flex;flex-direction:column;gap:7px;margin-top:7px"></div>
+          </div>
+          <div class="g2" style="max-width:380px;margin-bottom:11px">
+            <button class="b-slate" onclick="addFFFRow()">➕ Add Option</button>
+            <button class="b-slate" onclick="delFFFRow()">➖ Remove Last</button>
+          </div>
+          <div class="g2" style="max-width:380px">
+            <button class="b-green" onclick="saveFFFQ()" id="f-save">💾 Add to FFF Bank</button>
+            <button class="b-slate" onclick="clearFFFForm()">✕ Clear / Cancel Edit</button>
+          </div>
+        </div>
+        <h4>FFF bank:</h4>
+        <table class="qt"><thead><tr><th>#</th><th>Question</th><th>Correct Order</th><th>Items</th><th>Actions</th></tr></thead>
+          <tbody id="tb-fff"></tbody></table>
+      </div>
+
+      <!-- AUDIENCE & ACCESS -->
+      <div id="t-aud-mgmt" class="pane" style="display:none">
+
+        <div class="card-form">
+          <h4>🚪 Game Room — <span id="mgmt-room" style="color:var(--gold)">MAIN</span></h4>
+          <p class="hint" style="margin-bottom:11px">
+            Each room is a completely separate show: its own contestant, audience, scores and question usage.
+            The question bank is shared by every room.<br><br>
+            <b>Audience link for this room:</b>
+            <code id="mgmt-link" style="display:inline-block;background:var(--bg-deep);padding:4px 8px;
+              border-radius:5px;color:var(--gold);user-select:all;word-break:break-all">—</code>
+          </p>
+          <div class="g2" style="max-width:520px">
+            <button class="b-slate" onclick="createRoom()">＋ Create Another Room</button>
+            <button class="b-red" onclick="deleteRoom()">🗑 Delete This Room</button>
+          </div>
+        </div>
+
+        <div class="card-form" style="border-color:rgba(239,68,68,.4)">
+          <h4 style="color:var(--red)">🔄 Reset Full Game — fresh start</h4>
+          <p class="hint" style="margin-bottom:11px">
+            Puts room <b id="reset-room">MAIN</b> back to the very beginning, ready for a new show.
+          </p>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;font-size:.8rem;line-height:1.85;margin-bottom:13px">
+            <div style="background:var(--bg-deep);border:1px solid var(--bd);border-radius:7px;padding:11px">
+              <b style="color:var(--red)">CLEARED</b><br>
+              · Contestant name, age, city<br>
+              · Level back to 1<br>
+              · All four lifelines restored<br>
+              · Timer, locked answer, 50:50<br>
+              · Every connected audience phone<br>
+              · All scores, votes and answers<br>
+              · Used-question marks (all 14 levels)<br>
+              · Screen back to the idle logo
+            </div>
+            <div style="background:var(--bg-deep);border:1px solid var(--bd);border-radius:7px;padding:11px">
+              <b style="color:var(--green)">KEPT — nothing is lost</b><br>
+              · Every question in the bank<br>
+              · Audience question bank<br>
+              · FFF rounds<br>
+              · Explanations and 50:50 settings<br>
+              · Host accounts<br>
+              · Other rooms
+            </div>
+          </div>
+          <button class="b-red b-big" onclick="resetFullGame()">🔄 RESET FULL GAME</button>
+        </div>
+
+        <div class="card-form">
+          <h4>👥 Connected Audience <span class="n" id="mgmt-count" style="margin-left:8px">0</span></h4>
+          <p class="hint" style="margin-bottom:11px">
+            Everyone who has joined on their phone. Clear this before a new show so the next audience starts fresh.
+          </p>
+          <div class="g2" style="max-width:520px">
+            <button class="b-green" onclick="exportAudience()">⬇️ Download as Excel (CSV)</button>
+            <button class="b-red" onclick="removeAllAudience()">🗑 Remove ALL Audience</button>
+          </div>
+          <div style="max-height:260px;overflow-y:auto;margin-top:14px">
+            <table class="qt"><thead><tr><th>#</th><th>Name</th><th>Age</th><th>Mobile</th><th>City</th><th>Score</th><th></th></tr></thead>
+              <tbody id="tb-audience"></tbody></table>
+          </div>
+        </div>
+
+        <div class="card-form">
+          <h4>🔐 Host Accounts</h4>
+          <p class="hint" style="margin-bottom:11px">
+            You are signed in as <b id="mgmt-email">—</b>.<br><br>
+            To let someone host from another laptop, create an account for them and add their UID to the admin list.
+            <b>Only you can do this</b> — it happens inside your Firebase console, which nobody else can reach.
+          </p>
+          <div style="background:var(--bg-deep);border:1px solid var(--bd);border-radius:7px;padding:12px;font-size:.82rem;line-height:1.9">
+            <b style="color:var(--gold)">To create a host login</b><br>
+            1. Firebase console → <b>Authentication → Users → Add user</b><br>
+            2. Enter an email and password → Add user<br>
+            3. Copy the new <b>User UID</b> from that list<br>
+            4. Realtime Database → Data → <b>admins</b> → add that UID with value <b>true</b><br><br>
+            <b style="color:var(--gold)">To change a password</b> — Authentication → Users → ⋮ → Reset password<br>
+            <b style="color:var(--gold)">To revoke access</b> — delete the UID from <b>admins</b> (instant, even mid-show)
+          </div>
+          <button class="b-slate" style="margin-top:12px;max-width:220px" onclick="hostSignOut()">🚪 Sign out of this device</button>
+        </div>
+
+      </div>
+
+      <!-- BACKUP -->
+      <div id="t-io" class="pane" style="display:none">
+        <div class="warnbox" style="margin-bottom:16px">
+          <b>Do this before every show.</b> Your entire question bank lives in Firebase. One bad click, one wrong
+          rule change, or one accidental project deletion and it is gone. Download a backup and keep it somewhere safe.
+        </div>
+        <div class="card-form">
+          <h4>⬇️ Download Backup</h4>
+          <p class="hint" style="margin-bottom:11px">Saves every level question, audience question and FFF round as a single JSON file.</p>
+          <button class="b-green" onclick="exportBank()">⬇️ Download question-bank.json</button>
+        </div>
+        <div class="card-form">
+          <h4>⬆️ Restore From Backup</h4>
+          <p class="hint" style="margin-bottom:11px">
+            <b style="color:var(--red)">This replaces everything currently in the bank.</b> You will be asked to confirm.
+          </p>
+          <input type="file" id="io-file" accept="application/json" style="margin-bottom:11px">
+          <button class="b-red" onclick="importBank()">⬆️ Restore (overwrites bank)</button>
+        </div>
+        <div class="card-form">
+          <h4>🆔 Your Admin UID</h4>
+          <p class="hint" style="margin-bottom:9px">Paste this into <code>admins</code> in the Firebase console to give this device host rights.</p>
+          <code id="io-uid" style="background:#0d1628;padding:6px 10px;border-radius:5px;color:var(--gold);
+            font-family:monospace;user-select:all;display:inline-block;word-break:break-all">—</code>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- DIAGNOSTICS MODAL -->
+<div class="ov" id="diag">
+  <div class="mcard" style="width:min(720px,100%)">
+    <div class="mhead"><h2>🩺 Connection Diagnostics</h2>
+      <button class="mclose" onclick="document.getElementById('diag').classList.remove('open')">✕</button></div>
+    <div class="mbody">
+      <p class="hint" style="margin-bottom:14px">Testing every permission the controller needs. Send the result to Claude.</p>
+      <div id="diag-out" style="font-family:monospace;font-size:.82rem;line-height:1.9"></div>
+      <button class="b-slate" style="margin-top:16px;max-width:240px" onclick="copyDiag()">📋 Copy Result</button>
+    </div>
+  </div>
+</div>
+
+<!-- HELP MODAL -->
+<div class="ov" id="help">
+  <div class="mcard" style="width:min(560px,100%)">
+    <div class="mhead"><h2>⌨️ Live Keyboard Shortcuts</h2><button class="mclose" onclick="closeHelp()">✕</button></div>
+    <div class="mbody">
+      <p class="hint" style="margin-bottom:14px">Work without looking at the mouse during the show.
+        Shortcuts are off while you are typing in a field or a dialog is open.</p>
+      <table class="qt"><tbody id="sc-table"></tbody></table>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════
+   KAUN BANEGA SIDDHATMA — HOST CONTROLLER
+   Writes game_state + mobile_state. Projector and phones only read.
+   ═══════════════════════════════════════════════════════════════ */
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBvFw7TNIflcBbms-K4sk_jrqgdzYYJKok",
+  authDomain: "kounbanegasiddhatma.firebaseapp.com",
+  databaseURL: "https://kounbanegasiddhatma-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "kounbanegasiddhatma",
+  storageBucket: "kounbanegasiddhatma.firebasestorage.app",
+  messagingSenderId: "53011686572",
+  appId: "1:53011686572:web:f9b02eb2aed988c9ed6b09"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+const auth = firebase.auth();
+
+/* ---------- 14 LEVELS — no prize money, levels only ---------- */
+const LEVELS = [
+  {n:1,  name:"दर्शन प्रतिमा"},
+  {n:2,  name:"व्रत प्रतिमा"},
+  {n:3,  name:"सामायिक प्रतिमा"},
+  {n:4,  name:"प्रोषध प्रतिमा"},
+  {n:5,  name:"सचित्त त्याग प्रतिमा"},
+  {n:6,  name:"रात्रि भुक्ति त्याग प्रतिमा"},
+  {n:7,  name:"ब्रह्मचर्य प्रतिमा",   safe:true},
+  {n:8,  name:"आरम्भ त्याग प्रतिमा"},
+  {n:9,  name:"परिग्रह त्याग प्रतिमा"},
+  {n:10, name:"अनुमति त्याग प्रतिमा"},
+  {n:11, name:"उद्दिष्ट त्याग प्रतिमा"},
+  {n:12, name:"मुनि दीक्षा",         safe:true},
+  {n:13, name:"केवलज्ञान"},
+  {n:14, name:"सिद्ध पद",            safe:true}
+];
+const secsFor = n => n <= 7 ? 30 : n <= 12 ? 60 : 120;
+const POLL_SECS = 30;          // audience poll countdown
+const POLL_GRAPH_DELAY = 5000; // show bars on projector this long after opening the poll
+
+/* ---------- ROOMS ----------
+   Every live thing lives under rooms/<ROOM>/… so two shows never collide.
+   The question bank stays global — same content, separate sessions.        */
+const DEFAULT_ROOM = 'MAIN';
+let ROOM = DEFAULT_ROOM;
+const R  = p => `rooms/${ROOM}/${p}`;
+const cleanRoom = s => String(s||'').toUpperCase().replace(/[^A-Z0-9-]/g,'').slice(0,20);
+let roomsIndex = {};
+let roomUsed = {};                                   // rooms/<ROOM>/used/<level>/<key> = true
+const isUsed = (lvl, key) => !!(roomUsed[lvl] && roomUsed[lvl][key]);
+
+/* ---------- STATE ---------- */
+let GS = null;                 // mirror of game_state
+let MS = null;                 // mirror of mobile_state
+let bank = { levels:{}, audience:{}, fff:{} };
+let players = {};
+let srvOffset = 0;
+let editing = { lvl:null, aud:null, fff:null };
+let pollTally = {A:0,B:0,C:0,D:0,total:0};
+let currentPollId = null, currentFFFId = null, currentAudQId = null;
+let liveRefs = {};   // detach old listeners when a new round starts
+function watchRef(slot, path, cb){
+  if(liveRefs[slot]) liveRefs[slot].off();
+  liveRefs[slot] = db.ref(path);
+  liveRefs[slot].on('value', cb);
+}
+
+const now = () => Date.now() + srvOffset;
+const esc = s => String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const $ = id => document.getElementById(id);
+
+function toast(msg, isErr){
+  const t = $('toast');
+  t.textContent = msg;
+  t.classList.toggle('err', !!isErr);
+  t.classList.add('show');
+  clearTimeout(t._t);
+  t._t = setTimeout(()=>t.classList.remove('show'), 2600);
+}
+function logLine(msg){
+  const l = $('log');
+  const time = new Date().toLocaleTimeString('en-IN',{hour12:false});
+  l.insertAdjacentHTML('afterbegin', `<div><b>${time}</b> ${esc(msg)}</div>`);
+  while(l.children.length > 60) l.lastChild.remove();
+}
+
+/* ---------- AUTH GATE — host signs in with an email + password ---------- */
+let booted = false;
+
+/* the device shortcut only makes sense on a local server — on the web it creates
+   a brand-new anonymous account that can never be an admin */
+const IS_LOCAL = location.protocol === 'file:' ||
+                 /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname);
+
+function showLogin(msg, isErr){
+  $('gate-spin').style.display = 'none';
+  $('gate-title').textContent = 'Host Sign In';
+  $('gate-form').style.display = 'flex';
+  $('device-login').style.display = IS_LOCAL ? 'block' : 'none';
+  $('gate-msg').innerHTML = msg || 'Enter the host account for this show.';
+  $('gate-msg').style.color = isErr ? 'var(--red)' : '';
+  $('lg-btn').disabled = false;
+  $('lg-btn').textContent = '🔓 Sign in as Host';
+}
+
+function hostLogin(ev){
+  ev.preventDefault();
+  const email = $('lg-email').value.trim();
+  const pass  = $('lg-pass').value;
+  $('lg-btn').disabled = true;
+  $('lg-btn').textContent = 'Signing in…';
+  auth.signInWithEmailAndPassword(email, pass)
+    .catch(e=>{
+      const msg = {
+        'auth/invalid-credential' : 'Wrong email or password.',
+        'auth/wrong-password'     : 'Wrong password.',
+        'auth/user-not-found'     : 'No host account with that email.',
+        'auth/invalid-email'      : 'That is not a valid email address.',
+        'auth/too-many-requests'  : 'Too many attempts. Wait a minute and try again.',
+        'auth/user-disabled'      : 'That account has been disabled by the owner.',
+        'auth/operation-not-allowed':'Email/Password sign-in is not enabled in the Firebase console yet.'
+      }[e.code] || e.message;
+      showLogin('<b>' + esc(msg) + '</b>', true);
+      $('lg-pass').value = '';
+    });
+}
+
+/* fallback for the owner's own laptop — no password needed, the device is already an admin */
+function deviceLogin(){
+  $('lg-btn').disabled = true;
+  auth.signInAnonymously().catch(e=>{
+    showLogin('<b>' + esc(e.code === 'auth/operation-not-allowed'
+      ? 'Anonymous sign-in is turned off in the Firebase console.' : e.message) + '</b>', true);
+  });
+}
+
+auth.onAuthStateChanged(user=>{
+  if(!user){ showLogin(); return; }
+
+  $('io-uid').textContent = user.uid;
+  $('mgmt-email').textContent = user.email || user.uid;
+
+  db.ref('admins/'+user.uid).once('value').then(s=>{
+    if(s.val() === true){
+      $('gate').style.display = 'none';
+      if(!booted){ booted = true; boot(); }
+    } else {
+      // if the session changed to a non-admin after boot, the gate must come BACK
+      $('gate').style.display = '';
+      $('gate-spin').style.display = 'none';
+      $('gate-form').style.display = 'none';
+      $('gate-title').textContent = user.isAnonymous ? 'Signed in anonymously — not a host'
+                                                     : 'This account is not a host yet';
+      $('gate-msg').innerHTML = (user.isAnonymous
+        ? `<b style="color:var(--red)">You are signed in anonymously.</b><br>
+           Anonymous accounts are created fresh per website and are never admins.<br>
+           Sign out and use your host email and password.<br><br>`
+        : `Signed in as <b>${esc(user.email||'')}</b>, but it has no host rights.`) + `
+        <br><br>The owner must add this UID under <b>admins</b> in the Realtime Database:
+        <br><br><code>${esc(user.uid)}</code>
+        <br><br><button class="b-slate" style="margin:12px auto 0;display:inline-flex" onclick="location.reload()">↻ Reload</button>
+        <button class="b-slate" style="margin:12px 0 0 8px;display:inline-flex" onclick="auth.signOut().then(()=>location.reload())">Sign out</button>`;
+    }
+  }).catch(e=>{
+    $('gate-spin').style.display = 'none';
+    $('gate-form').style.display = 'none';
+    $('gate-title').textContent = 'Cannot read database';
+    $('gate-msg').innerHTML = `<b style="color:var(--red)">${esc(e.message)}</b><br><br>
+      Publish <b>FIREBASE_RULES.json</b> in Realtime Database → Rules, then reload.`;
+  });
+});
+
+/* ---------- ROOM SWITCHING ---------- */
+let roomRefs = [];
+function detachRoom(){
+  roomRefs.forEach(r => r.off());
+  roomRefs = [];
+  clearPollTimers(); clearAudQTimers();
+  Object.values(liveRefs).forEach(r => r.off()); liveRefs = {};
+  GS = null; MS = null; players = {}; roomUsed = {};
+  currentPollId = currentFFFId = currentAudQId = null;
+}
+function attachRoom(){
+  const on = (path, cb) => { const r = db.ref(R(path)); r.on('value', cb); roomRefs.push(r); };
+
+  on('game_state', s=>{ GS = s.val(); if(!GS) initGame(); else paintGame(); });
+  on('mobile_state', s=>{ MS = s.val() || {}; paintMobile(); });
+  on('used', s=>{ roomUsed = s.val() || {}; refreshPicker(); renderLevelBank(); });
+  on('players', s=>{
+    players = s.val() || {};
+    const n = Object.keys(players).length;
+    $('aud-count').textContent = n; $('s-joined').textContent = n;
+    $('join-live').textContent = n + ' joined';
+    renderAudienceMgmt();
+    if(GS?.screen === 'join' && GS.joinCount !== n) gsUpdate({joinCount:n});
+  });
+  logLine(`Room: ${ROOM}`);
+}
+function switchRoom(room){
+  const r = cleanRoom(room);
+  if(!r || r === ROOM){ $('sel-room').value = ROOM; return; }
+  detachRoom();
+  ROOM = r;
+  try { localStorage.setItem('kbs-room', ROOM); } catch(e){}
+  $('sel-room').value = ROOM;
+  $('in-joinurl').value = DEFAULT_JOIN_URL + '/?room=' + ROOM;
+  paintRoomInfo();
+  attachRoom();
+  toast('Switched to room ' + ROOM);
+}
+function paintRoomInfo(){
+  $('mgmt-room').textContent = ROOM;
+  $('reset-room').textContent = ROOM;
+  $('mgmt-link').textContent = DEFAULT_JOIN_URL + '/?room=' + ROOM;
+}
+function renderRoomList(){
+  const sel = $('sel-room');
+  const names = Object.keys(roomsIndex);
+  if(!names.includes(ROOM)) names.push(ROOM);
+  sel.innerHTML = names.sort().map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join('');
+  sel.value = ROOM;
+}
+function registerRoom(r){
+  const meta = {name:r, createdAt:Date.now(), owner:auth.currentUser?.uid || ''};
+  return Promise.all([
+    db.ref(`rooms/${r}/meta`).once('value').then(s=>{ if(!s.exists()) return db.ref(`rooms/${r}/meta`).set(meta); }),
+    db.ref(`rooms_index/${r}`).once('value').then(s=>{ if(!s.exists()) return db.ref(`rooms_index/${r}`).set(meta); })
+  ]);
+}
+function createRoom(){
+  const raw = prompt('New room name\n\nLetters, numbers and dashes only — this appears in the audience link.\nExamples: JAIPUR, SHOW-2, SUNDAY', '');
+  if(raw === null) return;
+  const r = cleanRoom(raw);
+  if(r.length < 2) return toast('Room name needs at least 2 characters', true);
+  if(roomsIndex[r]) { switchRoom(r); return toast('That room already exists — switched to it'); }
+  registerRoom(r)
+    .then(()=>{ switchRoom(r); toast('Room ' + r + ' created'); })
+    .catch(e=>toast('Could not create room: ' + e.message, true));
+}
+function deleteRoom(){
+  if(ROOM === DEFAULT_ROOM) return toast('The MAIN room cannot be deleted', true);
+  const r = ROOM;
+  if(!confirm(`DELETE ROOM ${r}?\n\nIts contestant, audience, scores and answers are erased.\n`
+    + `Your question bank is shared and is NOT affected.\n\nThis cannot be undone.`)) return;
+  Promise.all([db.ref(`rooms/${r}`).remove(), db.ref(`rooms_index/${r}`).remove()])
+    .then(()=>{ switchRoom(DEFAULT_ROOM); toast('Room ' + r + ' deleted'); })
+    .catch(e=>toast('Delete failed: ' + e.message, true));
+}
+
+/* ---------- BOOT ---------- */
+function boot(){
+  db.ref('.info/serverTimeOffset').on('value', s => srvOffset = s.val() || 0);
+
+  try { ROOM = cleanRoom(localStorage.getItem('kbs-room')) || DEFAULT_ROOM; } catch(e){ ROOM = DEFAULT_ROOM; }
+  const urlRoom = cleanRoom(new URLSearchParams(location.search).get('room'));
+  if(urlRoom) ROOM = urlRoom;
+
+  // small index so listing rooms never downloads their game state
+  db.ref('rooms_index').on('value', s=>{
+    roomsIndex = s.val() || {};
+    renderRoomList();
+  });
+  registerRoom(ROOM);
+  $('in-joinurl').value = DEFAULT_JOIN_URL + '/?room=' + ROOM;
+  paintRoomInfo();
+  attachRoom();
+
+  db.ref('.info/connected').on('value', s=>{
+    const ok = s.val() === true;
+    $('cdot').classList.toggle('ok', ok);
+    $('ctext').textContent = ok ? 'Cloud connected' : 'Disconnected';
+    $('ctext').style.color = ok ? 'var(--green)' : 'var(--red)';
+  });
+
+  db.ref('question_bank').on('value', s=>{
+    const v = s.val() || {};
+    bank.levels   = v.levels   || {};
+    bank.audience = v.audience || {};
+    bank.fff      = v.fff      || {};
+    renderLevelBank(); renderAudBank(); renderFFFBank(); refreshPicker();
+  });
+
+  for(let i=0;i<4;i++) addFFFRow();
+  paintPollMode();
+  setInterval(tickTimer, 200);
+  bindKeys();
+  logLine('Controller ready.');
+}
+
+/* ---------- GAME STATE ---------- */
+function initGame(){
+  db.ref(R('game_state')).set({
+    screen:'idle', player:{name:'—',city:''}, level:1,
+    question:null, optionsVisible:false, lockedOption:null, reveal:'none',
+    hidden5050:[], lifelines:{'5050':false,poll:false,expert:false,call:false},
+    timer:{running:false,paused:false,duration:30,startAt:0,left:30,label:'Ready'},
+    audio:{cmd:'stop',seq:0}, theme:'dark', muted:false, seq:1
+  });
+  db.ref(R('mobile_state')).set({mode:'blank',seq:1});
+}
+function gsUpdate(obj){
+  obj.seq = (GS?.seq || 0) + 1;
+  return db.ref(R('game_state')).update(obj).catch(e=>toast('Write failed: '+e.message,true));
+}
+function msUpdate(obj){
+  obj.seq = (MS?.seq || 0) + 1;
+  return db.ref(R('mobile_state')).update(obj).catch(e=>toast('Write failed: '+e.message,true));
+}
+
+function paintGame(){
+  if(!GS) return;
+  const lv = LEVELS.find(l=>l.n===GS.level) || LEVELS[0];
+  $('v-name').textContent = GS.player?.name || '—';
+  $('v-city').textContent = [GS.player?.city ? '📍 '+GS.player.city : '',
+                             GS.player?.age ? 'Age '+GS.player.age : ''].filter(Boolean).join(' · ');
+  $('v-lvl').textContent  = `Level ${lv.n}: ${lv.name}`;
+  $('v-prize').textContent= `Question ${lv.n} of 14`;
+  $('v-lvlnum').textContent = lv.n;
+  const safe = [...LEVELS].filter(l=>l.safe && l.n < lv.n).pop();
+  $('v-safe').innerHTML = safe ? `Safe level<br><span style="color:var(--gold)">L${safe.n} — ${safe.name}</span>`
+                               : `<span style="color:var(--tx-mut)">No safe level yet</span>`;
+
+  const q = GS.question;
+  $('v-q').textContent = q?.text || 'No question loaded';
+  $('v-script').textContent = q?.explanation || '—';
+  ['A','B','C','D'].forEach(k=>{
+    const el = $('v-'+k);
+    el.querySelector('.tx').textContent = q ? (q[k.toLowerCase()] || '—') : '—';
+    el.classList.toggle('correct', !!q && q.correct === k);
+    el.classList.toggle('gone', (GS.hidden5050||[]).includes(k));
+    el.classList.toggle('locked', GS.lockedOption === k);
+    const willHide = q && (q.hide5050||'').toUpperCase().includes(k) && q.correct !== k;
+    el.querySelector('.tag5050').textContent = willHide ? '(50:50 hides)' : '';
+  });
+
+  const L = GS.lifelines || {};
+  [['5050','50:50'],['poll','📊 Poll'],['expert','💡 Expert'],['call','📞 Call']].forEach(([k,label])=>{
+    const c = $('ll-'+k);
+    c.classList.toggle('used', !!L[k]);
+    c.querySelector('.ll-s').textContent = L[k] ? 'USED' : 'Ready';
+  });
+
+  $('t-preset').textContent = secsFor(lv.n)+'s';
+  $('t-label').textContent = GS.timer?.label || 'Ready';
+  if(!$('in-name').matches(':focus')) $('in-name').value = GS.player?.name === '—' ? '' : (GS.player?.name||'');
+  if(!$('in-city').matches(':focus')) $('in-city').value = GS.player?.city || '';
+  if(!$('in-age').matches(':focus'))  $('in-age').value  = GS.player?.age  || '';
+
+  const light = GS.theme === 'light';
+  $('btn-theme').textContent = light ? '☀️ Light' : '🌙 Dark';
+  document.documentElement.setAttribute('data-theme', light ? 'light' : 'dark');
+  $('btn-mute').classList.toggle('on', !!GS.muted);
+  $('btn-mute').textContent = GS.muted ? '🔇 MUTED — click to unmute' : '🔇 MUTE — no sound will play';
+
+  refreshPicker();
+}
+
+function paintMobile(){
+  $('s-mode').textContent = MS?.mode || 'blank';
+  $('s-mode').style.fontSize = '.95rem';
+}
+
+/* ---------- CONTESTANT ---------- */
+function savePlayer(){
+  const name = $('in-name').value.trim() || '—';
+  const city = $('in-city').value.trim();
+  const age  = parseInt($('in-age').value, 10);
+  gsUpdate({player:{name, city, age: isNaN(age) ? null : age}});
+  logLine(`Contestant set: ${name}${isNaN(age)?'':', age '+age}`);
+  toast('Contestant updated');
+}
+
+/* pull a contestant straight out of the last FFF result */
+let lastFFFWinners = [];
+function refreshFFFWinners(){
+  const sel = $('sel-fff-winner');
+  $('fff-win-n').textContent = lastFFFWinners.length + ' from FFF';
+  sel.innerHTML = '<option value="">— pick from last FFF result —</option>' +
+    lastFFFWinners.map((w,i)=>`<option value="${w.uid}">#${i+1} ${esc(w.name)} · ${w.detail}</option>`).join('');
+}
+function useFFFWinner(){
+  const uid = $('sel-fff-winner').value;
+  if(!uid) return toast('Pick an FFF player first', true);
+  const p = players[uid];
+  if(!p) return toast('That player is no longer connected', true);
+  $('in-name').value = p.name || '';
+  $('in-city').value = p.city || '';
+  $('in-age').value  = p.age  || '';
+  savePlayer();
+  toast('Contestant filled from FFF');
+}
+function newContestant(){
+  if(!confirm('Start a NEW contestant?\n\nThis resets level to 1, clears all four lifelines, clears the question and stops the timer.')) return;
+  gsUpdate({
+    level:1, question:null, optionsVisible:false, lockedOption:null, reveal:'none', hidden5050:[],
+    lifelines:{'5050':false,poll:false,expert:false,call:false},
+    timer:{running:false,paused:false,duration:30,startAt:0,left:30,label:'Ready'},
+    screen:'idle'
+  });
+  logLine('NEW CONTESTANT — lifelines and level reset');
+  toast('New contestant — lifelines reset');
+}
+function changeLevel(d){
+  const n = Math.min(14, Math.max(1, (GS?.level||1) + d));
+  const s = secsFor(n);
+  gsUpdate({level:n, question:null, optionsVisible:false, lockedOption:null, reveal:'none', hidden5050:[],
+            timer:{running:false,paused:false,duration:s,startAt:0,left:s,label:'Ready'}});
+  logLine(`Level → ${n} (timer preset ${s}s)`);
+}
+
+/* ---------- QUESTION LOADING ---------- */
+function poolFor(lvl){ return bank.levels[lvl] || {}; }
+function refreshPicker(){
+  const lvl = GS?.level || 1;
+  const pool = poolFor(lvl);
+  const keys = Object.keys(pool);
+  const unused = keys.filter(k=>!isUsed(lvl,k));
+  $('v-pool').textContent = `${unused.length} unused / ${keys.length}`;
+  const sel = $('pick-q');
+  const prev = sel.value;
+  sel.innerHTML = '<option value="">— or pick manually —</option>' + keys.map(k=>
+    `<option value="${k}">${isUsed(lvl,k)?'✔ ':''}${esc(pool[k].text).slice(0,70)}</option>`).join('');
+  sel.value = prev;
+}
+function loadQ(lvl, key){
+  const q = poolFor(lvl)[key];
+  if(!q) return;
+  gsUpdate({
+    question:{key, text:q.text, a:q.a, b:q.b, c:q.c, d:q.d, correct:q.correct,
+              hide5050:q.hide5050||'', explanation:q.explanation||''},
+    optionsVisible:false, lockedOption:null, reveal:'none', hidden5050:[],
+    timer:{running:false,paused:false,duration:secsFor(lvl),startAt:0,left:secsFor(lvl),label:'Ready'}
+  });
+  logLine(`Loaded: ${q.text.slice(0,50)}`);
+  toast('Question loaded — not on screen yet');
+}
+function loadRandomQuestion(){
+  const lvl = GS?.level || 1;
+  const pool = poolFor(lvl);
+  const unused = Object.keys(pool).filter(k=>!isUsed(lvl,k));
+  if(!unused.length){
+    toast(`No unused questions left in Level ${lvl}. Add more, or Reset the pool in CMS.`, true);
+    return;
+  }
+  loadQ(lvl, unused[Math.floor(Math.random()*unused.length)]);
+}
+function loadPickedQuestion(key){ if(key) loadQ(GS?.level||1, key); }
+function markUsed(used){
+  const k = GS?.question?.key;
+  if(!k) return toast('No question loaded', true);
+  db.ref(R(`used/${GS.level}/${k}`)).set(used ? true : null);
+  toast(used ? 'Marked used' : 'Marked unused');
+}
+
+/* ---------- PROJECTOR ACTIONS ---------- */
+function setScreen(s){ clearPollTimers(); gsUpdate({screen:s}); logLine('Screen → '+s); }
+function showQuestion(){
+  if(!GS?.question) return toast('Load a question first', true);
+  clearPollTimers();          // nothing may drag the screen back to the poll
+  gsUpdate({screen:'question', optionsVisible:false, lockedOption:null, reveal:'none'});
+  logLine('Question on screen (options hidden)');
+}
+function revealOptions(v){
+  if(!GS?.question) return toast('Load a question first', true);
+  if(v){
+    // revealing the options starts the clock automatically
+    const secs = secsFor(GS.level || 1);
+    gsUpdate({screen:'question', optionsVisible:true,
+      timer:{running:true, paused:false, duration:secs, left:secs, startAt:now(), label:'Answer Time'}});
+    logLine(`Options revealed — timer auto-started (${secs}s)`);
+  } else {
+    gsUpdate({screen:'question', optionsVisible:false});
+    logLine('Options hidden');
+  }
+}
+function lockAnswer(k){
+  if(!GS?.question) return toast('Load a question first', true);
+  const patch = {lockedOption:k, audio:{cmd:'lock',seq:(GS.audio?.seq||0)+1}};
+  if(k && GS.timer?.running){
+    // locking an answer stops the clock
+    patch.timer = {...GS.timer, running:false, paused:true, left:remaining()};
+  }
+  gsUpdate(patch);
+  logLine(k ? `LOCKED ${k} — timer paused` : 'Lock cleared');
+}
+function reveal(kind){
+  if(!GS?.question) return toast('Load a question first', true);
+  if(kind === 'correct' || kind === 'wrong'){
+    const locked = GS.lockedOption;
+    const real = GS.question.correct;
+    if(locked && ((kind==='correct') !== (locked===real))){
+      if(!confirm(`⚠️ MISMATCH\n\nContestant locked ${locked}. The correct answer is ${real}.\n\n`
+        + `You are about to show "${kind.toUpperCase()}".\n\nShow it anyway?`)) return;
+    }
+  }
+  gsUpdate({reveal:kind, optionsVisible:true, screen:'question',
+            timer:{...GS.timer, running:false, paused:true, left:remaining()}});
+  if(kind === 'correct'){
+    db.ref(R(`used/${GS.level}/${GS.question.key}`)).set(true);
+    logLine(`✅ CORRECT — Level ${GS.level} won`);
+  } else if(kind === 'wrong'){
+    db.ref(R(`used/${GS.level}/${GS.question.key}`)).set(true);
+    logLine(`❌ WRONG on Level ${GS.level}`);
+  }
+}
+function walkAway(){
+  if(!confirm('Contestant WALKS AWAY?\n\nThe projector will show the walk-away screen with the level they reached.')) return;
+  gsUpdate({screen:'walkaway', reveal:'none'});
+  logLine('🚶 Walk away');
+}
+function playAudio(cmd){
+  if(GS?.muted && cmd !== 'stop') return toast('Audio is muted — unmute first', true);
+  gsUpdate({audio:{cmd, seq:(GS?.audio?.seq||0)+1}});
+  logLine('Audio: '+cmd);
+}
+function toggleMute(){
+  const m = !GS?.muted;
+  gsUpdate({muted:m, audio:{cmd: m ? 'mute' : 'unmute', seq:(GS?.audio?.seq||0)+1}});
+  logLine(m ? '🔇 MUTED' : '🔊 Unmuted');
+  toast(m ? 'All sound muted' : 'Sound on');
+}
+function toggleTheme(){
+  const light = GS?.theme !== 'light';
+  gsUpdate({theme: light ? 'light' : 'dark'});
+  logLine('Theme → ' + (light ? 'light' : 'dark'));
+}
+
+/* ---------- LIFELINES ---------- */
+function useLifeline(name){
+  if(GS?.lifelines?.[name]) return;
+  if(!GS?.question && name === '5050') return toast('Load a question first', true);
+
+  if(name === '5050'){
+    const q = GS.question;
+    const listed = (q.hide5050||'').toUpperCase().match(/[ABCD]/g) || [];
+    let hide = listed.filter(k => k !== q.correct).slice(0,2);
+    if(hide.length < 2){
+      // fall back to random wrong options so the show never stalls
+      const wrong = ['A','B','C','D'].filter(k => k !== q.correct && !hide.includes(k));
+      while(hide.length < 2 && wrong.length) hide.push(wrong.splice(Math.floor(Math.random()*wrong.length),1)[0]);
+      toast('50:50 list was incomplete — picked randomly', true);
+    }
+    // 50:50 also resets the clock and starts it again
+    const secs = secsFor(GS.level || 1);
+    gsUpdate({hidden5050:hide, lifelines:{...GS.lifelines,'5050':true}, screen:'question', optionsVisible:true,
+      timer:{running:true, paused:false, duration:secs, left:secs, startAt:now(), label:'Answer Time'}});
+    logLine(`50:50 used — hid ${hide.join(', ')} · timer reset to ${secs}s`);
+  }
+  else if(name === 'poll'){
+    gsUpdate({lifelines:{...GS.lifelines, poll:true}});
+    pollOpen();
+    logLine('Audience Poll lifeline started');
+  }
+  else if(name === 'expert'){
+    gsUpdate({lifelines:{...GS.lifelines, expert:true}, screen:'expert'});
+    logLine('Expert lifeline');
+  }
+  else if(name === 'call'){
+    // timer stays MANUAL — start it when the friend actually picks up
+    gsUpdate({lifelines:{...GS.lifelines, call:true}, screen:'call',
+      timer:{running:false, paused:true, duration:60, left:60, startAt:0, label:'Phone a Friend'}});
+    logLine('Phone a Friend — press ▶ Start when the friend answers');
+    toast('Call screen up. Start the 60s timer manually when they pick up.');
+  }
+}
+function resetLifelines(){
+  if(!confirm('Reset ALL four lifelines back to available?')) return;
+  gsUpdate({lifelines:{'5050':false,poll:false,expert:false,call:false}, hidden5050:[]});
+  logLine('Lifelines reset');
+}
+
+/* ---------- TIMER ---------- */
+function timerStart(){
+  const t = GS?.timer || {};
+  const left = t.paused ? (t.left ?? t.duration) : t.duration;
+  gsUpdate({timer:{running:true, paused:false, duration:t.duration||30, left,
+                   startAt:now(), label:t.label==='Ready'?'Answer Time':t.label}});
+  logLine('Timer started');
+}
+function timerPause(){
+  const t = GS?.timer; if(!t?.running) return;
+  gsUpdate({timer:{...t, running:false, paused:true, left:remaining()}});
+  logLine('Timer paused');
+}
+function timerReset(){
+  const d = secsFor(GS?.level||1);
+  gsUpdate({timer:{running:false,paused:false,duration:d,startAt:0,left:d,label:'Ready'}});
+}
+function timerStop(){
+  gsUpdate({timer:{running:false,paused:false,duration:GS?.timer?.duration||30,startAt:0,left:0,label:'Stopped'}});
+}
+function timerCustom(secs,label){
+  gsUpdate({timer:{running:true,paused:false,duration:secs,left:secs,startAt:now(),label}});
+  logLine(`${label}: ${secs}s`);
+}
+function remaining(){
+  const t = GS?.timer; if(!t) return 0;
+  if(!t.running) return t.left ?? t.duration ?? 0;
+  return Math.max(0, (t.left ?? t.duration) - (now() - t.startAt)/1000);
+}
+function tickTimer(){
+  const r = remaining();
+  const el = $('t-num');
+  const m = Math.floor(r/60), s = Math.floor(r%60);
+  el.textContent = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  el.className = 'tnum' + (r<=5 ? ' crit' : r<=10 ? ' warn' : '');
+  if(GS?.timer?.running && r <= 0){
+    gsUpdate({timer:{...GS.timer, running:false, paused:true, left:0, label:"TIME UP"}});
+    logLine('⏰ TIME UP');
+  }
+}
+
+/* ---------- MOBILE: MODES ---------- */
+function mobileMode(mode, extra){ msUpdate({mode, ...(extra||{})}); logLine('Phones → '+mode); }
+
+/* ---------- MOBILE: FFF ---------- */
+function shuffle(a){ a=[...a]; for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];} return a; }
+
+function fffStart(){
+  const key = $('sel-fff').value;
+  const q = bank.fff[key];
+  if(!q) return toast('Pick an FFF question first', true);
+  currentFFFId = key + '_' + Date.now();
+  const display = shuffle(q.items.map((t,i)=>({t, i})));
+  msUpdate({mode:'fff', fff:{
+    id: currentFFFId, text: q.text,
+    display: display.map(d=>d.t),
+    displayIdx: display.map(d=>d.i),
+    count: q.items.length,
+    open: true, revealed: false, correct: q.items,
+    openedAt: firebase.database.ServerValue.TIMESTAMP
+  }});
+  // the same round goes up on the projector at the same moment
+  gsUpdate({screen:'fff'});
+  watchFFF();
+  logLine(`FFF sent: ${q.text.slice(0,40)} — also on projector`);
+  toast('FFF is live on phones and projector');
+}
+function fffClose(){
+  if(!MS?.fff) return toast('No FFF round running', true);
+  msUpdate({fff:{...MS.fff, open:false}});
+  logLine('FFF entries closed');
+}
+function fffReveal(){
+  if(!MS?.fff) return toast('No FFF round running', true);
+  msUpdate({fff:{...MS.fff, open:false, revealed:true}});
+  gsUpdate({screen:'fff'});           // projector shows the correct order too
+  logLine('FFF correct order revealed — on projector');
+}
+function watchFFF(){
+  if(!currentFFFId) return;
+  watchRef('fff', R('fff_answers/'+currentFFFId), s=>{
+    const n = Object.keys(s.val() || {}).length;
+    $('s-resp').textContent = n;
+    $('fff-info').innerHTML = `<b style="color:var(--purple)">${n}</b> submissions received.`;
+  });
+}
+function fffLeaderboard(){
+  if(!currentFFFId) return toast('No FFF round to score', true);
+  db.ref(R('fff_answers/'+currentFFFId)).once('value').then(s=>{
+    const ans = s.val() || {};
+    const correct = (MS?.fff?.correct)||[];
+    const openedAt = MS?.fff?.openedAt || 0;
+    const rows = Object.entries(ans).map(([uid,v])=>{
+      const ok = Array.isArray(v.order) && v.order.length === correct.length
+                 && v.order.every((x,i)=>x === correct[i]);
+      return {uid, name:v.name||players[uid]?.name||'Player', ms:Math.max(0,(v.at||0)-openedAt), ok};
+    }).filter(r=>r.ok).sort((a,b)=>a.ms-b.ms).slice(0,10);
+
+    if(!rows.length) toast('Nobody got the order right', true);
+    // award points: 1st=50, 2nd=40 … 10th=5
+    const updates = {};
+    rows.forEach((r,i)=>{
+      const pts = Math.max(5, 50 - i*5);
+      updates[`${r.uid}/score`] = (players[r.uid]?.score || 0) + pts;
+    });
+    if(Object.keys(updates).length) db.ref(R('players')).update(updates);
+
+    lastFFFWinners = rows.map((r,i)=>({uid:r.uid, name:r.name, detail:(r.ms/1000).toFixed(2)+'s'}));
+    refreshFFFWinners();
+
+    msUpdate({mode:'leaderboard', leaderboard:{
+      title:'⚡ Fastest Finger First — Top 10',
+      rows: rows.map((r,i)=>({rank:i+1, name:r.name, detail:(r.ms/1000).toFixed(2)+'s'}))
+    }});
+    gsUpdate({screen:'fff_leaderboard', leaderboard:{
+      title:'⚡ Fastest Finger First — Top 10',
+      rows: rows.map((r,i)=>({rank:i+1, name:r.name, detail:(r.ms/1000).toFixed(2)+'s'}))
+    }});
+    logLine(`FFF leaderboard: ${rows.length} correct`);
+  });
+}
+
+/* ---------- MOBILE: POLL ---------- */
+let pollTimers = [];
+let pollLive = null;                       // the repeating bar-refresh, kept separate so it ALWAYS gets stopped
+let pollMode = 'auto';                     // 'auto' | 'manual'
+try { pollMode = localStorage.getItem('kbs-pollmode') || 'auto'; } catch(e){}
+
+function clearPollTimers(){
+  pollTimers.forEach(id => clearTimeout(id));
+  pollTimers = [];
+  if(pollLive){ clearInterval(pollLive); pollLive = null; }
+}
+function setPollMode(m){
+  pollMode = m;
+  try { localStorage.setItem('kbs-pollmode', m); } catch(e){}
+  paintPollMode();
+  toast('Poll mode: ' + m.toUpperCase());
+}
+function paintPollMode(){
+  $('pm-auto').classList.toggle('on', pollMode === 'auto');
+  $('pm-manual').classList.toggle('on', pollMode === 'manual');
+  $('poll-manual-btns').style.display = pollMode === 'manual' ? '' : 'none';
+  $('poll-mode-hint').textContent = pollMode === 'auto'
+    ? 'Auto: 30s vote → bars full screen → back to the question with the graph beside it.'
+    : 'Manual: you press each step yourself.';
+}
+
+function pollOpen(){
+  const q = GS?.question;
+  if(!q) return toast('Load a question first', true);
+  clearPollTimers();
+  currentPollId = 'poll_' + Date.now();
+  pollTally = {A:0,B:0,C:0,D:0,total:0};
+  const endsAt = now() + POLL_SECS * 1000;
+
+  msUpdate({mode:'poll', poll:{
+    id: currentPollId, text:q.text,
+    a:q.a, b:q.b, c:q.c, d:q.d,
+    hidden: GS.hidden5050 || [],
+    open:true, closed:false,
+    duration: POLL_SECS, endsAt
+  }});
+
+  gsUpdate({screen:'poll_wait', pollInline:false,
+    timer:{running:true, paused:false, duration:POLL_SECS, left:POLL_SECS, startAt:now(), label:'Audience Poll'}});
+
+  watchPoll();
+
+  // refresh the bars while voting is open — stopped the moment the poll closes
+  pollLive = setInterval(()=>{
+    if(MS?.poll?.open === false){ clearInterval(pollLive); pollLive = null; return; }
+    if(pollTally.total) pushPollToProjector(true);
+  }, 1200);
+
+  if(pollMode === 'auto'){
+    pollTimers.push(setTimeout(()=>{
+      gsUpdate({screen:'poll_result'});
+      pushPollToProjector(true);
+      logLine('Projector → live poll bars');
+    }, POLL_GRAPH_DELAY));
+
+    pollTimers.push(setTimeout(()=>{
+      pollClose();
+      logLine('Poll auto-closed (30s)');
+      pollTimers.push(setTimeout(()=>{ mobileMode('blank'); }, 3000));
+      pollTimers.push(setTimeout(()=>{ pollShowInline(); }, 5000));
+    }, POLL_SECS * 1000));
+  }
+
+  logLine(`Poll opened (${pollMode}) — ${POLL_SECS}s`);
+  toast(pollMode === 'auto' ? 'Voting open — 30s, runs itself' : 'Voting open — you control each step');
+}
+
+/* put the graph beside the question instead of taking over the screen */
+function pollShowInline(){
+  clearPollTimers();
+  pushPollToProjector(true);
+  gsUpdate({screen:'question', pollInline:true,
+    timer:{...(GS?.timer||{}), running:false, paused:true, label:'Audience Poll'}});
+  logLine('Poll graph pinned beside the question');
+}
+function pollHideInline(){
+  gsUpdate({pollInline:false});
+  logLine('Poll graph hidden');
+}
+function pollClose(){
+  if(!MS?.poll) return toast('No poll running', true);
+  if(pollLive){ clearInterval(pollLive); pollLive = null; }   // stop the screen being forced back
+  msUpdate({poll:{...MS.poll, open:false, closed:true}});
+  pushPollToProjector(true);
+  gsUpdate({screen:'poll_result', timer:{...(GS?.timer||{}), running:false, paused:true}});
+  logLine('Poll closed — final bars on projector');
+}
+function watchPoll(){
+  if(!currentPollId) return;
+  watchRef('poll', R('poll_votes/'+currentPollId), s=>{
+    const v = s.val() || {};
+    const t = {A:0,B:0,C:0,D:0,total:0};
+    Object.values(v).forEach(x=>{ if(t[x]!==undefined){ t[x]++; t.total++; } });
+    pollTally = t;
+    $('s-resp').textContent = t.total;
+    $('poll-res').innerHTML = ['A','B','C','D'].map(k=>{
+      const pct = t.total ? Math.round(t[k]/t.total*100) : 0;
+      return `<div class="pbar"><span class="k">${k}</span>
+        <span class="track"><span class="fill" style="width:${pct}%"></span></span>
+        <span class="pct">${pct}%</span></div>`;
+    }).join('');
+  });
+}
+function pushPollToProjector(silent){
+  const t = pollTally;
+  if(!t.total){ if(!silent) toast('No votes yet', true); return; }
+  gsUpdate({screen:'poll_result', pollResult:{
+    A:Math.round(t.A/t.total*100), B:Math.round(t.B/t.total*100),
+    C:Math.round(t.C/t.total*100), D:Math.round(t.D/t.total*100), total:t.total
+  }});
+  if(!silent) logLine(`Poll bars on projector (${t.total} votes)`);
+}
+
+/* ---------- MOBILE: AUDIENCE QUESTION ---------- */
+let audqTimers = [];
+function clearAudQTimers(){
+  audqTimers.forEach(id => { clearTimeout(id); clearInterval(id); });
+  audqTimers = [];
+}
+function audQSend(){
+  const key = $('sel-aud').value;
+  const q = bank.audience[key];
+  if(!q) return toast('Pick an audience question first', true);
+  clearAudQTimers();
+  currentAudQId = key + '_' + Date.now();
+  const endsAt = now() + POLL_SECS * 1000;
+  msUpdate({mode:'audq', audq:{
+    id:currentAudQId, text:q.text, a:q.a, b:q.b, c:q.c, d:q.d,
+    correct:q.correct, explanation:q.explanation||'',
+    open:true, revealed:false,
+    duration: POLL_SECS, endsAt,
+    openedAt: firebase.database.ServerValue.TIMESTAMP
+  }});
+  // mirror the same question onto the projector, with the same countdown
+  gsUpdate({screen:'audq',
+    timer:{running:true, paused:false, duration:POLL_SECS, left:POLL_SECS, startAt:now(), label:'Audience Question'}});
+  // close entries automatically when the clock runs out
+  audqTimers.push(setTimeout(()=>{
+    if(MS?.audq && MS.audq.id === currentAudQId && MS.audq.open){
+      msUpdate({audq:{...MS.audq, open:false}});
+      logLine('Audience Q auto-closed (30s)');
+    }
+  }, POLL_SECS * 1000));
+  watchRef('audq', R('audience_answers/'+currentAudQId), s=>{
+    const n = Object.keys(s.val()||{}).length;
+    $('s-resp').textContent = n;
+    $('aud-info').innerHTML = `<b style="color:var(--purple)">${n}</b> answers received.`;
+  });
+  logLine(`Audience Q sent: ${q.text.slice(0,40)}`);
+  toast('Question is live on phones');
+}
+function audQReveal(){
+  if(!MS?.audq) return toast('No audience question sent', true);
+  const id = MS.audq.id, correct = MS.audq.correct;
+  db.ref(R('audience_answers/'+id)).once('value').then(s=>{
+    const ans = s.val() || {};
+    const updates = {};
+    let right = 0;
+    Object.entries(ans).forEach(([uid,v])=>{
+      if(v.ans === correct){ right++; updates[`${uid}/score`] = (players[uid]?.score || 0) + 10; }
+    });
+    if(Object.keys(updates).length) db.ref(R('players')).update(updates);
+    msUpdate({audq:{...MS.audq, open:false, revealed:true}});
+    gsUpdate({timer:{running:false, paused:false, duration:POLL_SECS, left:0, startAt:0, label:'Ready'}});
+    logLine(`Audience Q revealed — ${right} correct, +10 each`);
+    toast(`${right} correct — screens clear in 5s`);
+    // 5 seconds to read the answer, then everything goes quiet
+    clearAudQTimers();
+    audqTimers.push(setTimeout(()=>{
+      mobileMode('blank');
+      gsUpdate({screen:'idle'});
+      logLine('Audience Q finished — screens blanked');
+    }, 5000));
+  });
+}
+
+/* ---------- MOBILE: LEADERBOARD ---------- */
+function audLeaderboard(){
+  const rows = Object.entries(players)
+    .map(([uid,p])=>({name:p.name||'Player', score:p.score||0}))
+    .sort((a,b)=>b.score-a.score).slice(0,10)
+    .map((r,i)=>({rank:i+1, name:r.name, detail:r.score+' pts'}));
+  if(!rows.length) return toast('Nobody has joined yet', true);
+  const lb = {title:'🎖️ Audience Leaderboard — Top 10', rows};
+  msUpdate({mode:'leaderboard', leaderboard:lb});
+  gsUpdate({screen:'fff_leaderboard', leaderboard:lb});
+  logLine('Audience leaderboard broadcast');
+}
+/* ---------- DIAGNOSTICS ---------- */
+let diagText = '';
+async function runDiagnostics(){
+  const out = $('diag-out');
+  $('diag').classList.add('open');
+  const lines = [];
+  const say = (ok, label, extra) => {
+    const mark = ok === null ? '·' : ok ? '✅' : '❌';
+    const col  = ok === null ? 'var(--tx-mut)' : ok ? 'var(--green)' : 'var(--red)';
+    lines.push(`${mark} ${label}${extra ? '  →  ' + extra : ''}`);
+    out.innerHTML = lines.map(l=>`<div style="color:${
+      l.startsWith('❌') ? 'var(--red)' : l.startsWith('✅') ? 'var(--green)' : 'var(--tx-mut)'}">${esc(l)}</div>`).join('');
+    diagText = lines.join('\n');
+  };
+
+  out.innerHTML = 'running…';
+  lines.length = 0;
+
+  const u = auth.currentUser;
+  say(null, 'page', location.href.split('?')[0]);
+  say(null, 'room', ROOM);
+  say(!!u, 'signed in', u ? (u.email || 'anonymous') : 'NOT SIGNED IN');
+  if(!u){ return; }
+  say(null, 'uid', u.uid);
+
+  const test = async (label, fn) => {
+    try { await fn(); say(true, label); }
+    catch(e){ say(false, label, e.code || e.message); }
+  };
+
+  await test('read  admins/<uid>',      ()=>db.ref('admins/'+u.uid).once('value').then(s=>{
+    if(s.val() !== true) throw new Error('value is ' + JSON.stringify(s.val()) + ' (expected true)'); }));
+  await test('read  question_bank',     ()=>db.ref('question_bank').limitToFirst(1).once('value'));
+  await test('read  rooms_index',       ()=>db.ref('rooms_index').once('value'));
+  await test('write rooms_index/'+ROOM, ()=>db.ref(`rooms_index/${ROOM}`).update({name:ROOM}));
+  await test('write rooms/'+ROOM+'/meta',       ()=>db.ref(`rooms/${ROOM}/meta`).update({name:ROOM}));
+  await test('write rooms/'+ROOM+'/game_state', ()=>db.ref(R('game_state/diagPing')).set(Date.now()));
+  await test('write rooms/'+ROOM+'/mobile_state',()=>db.ref(R('mobile_state/diagPing')).set(Date.now()));
+  await test('write rooms/'+ROOM+'/used',       ()=>db.ref(R('used/_diag')).set(true));
+  await test('read  rooms/'+ROOM+'/players',    ()=>db.ref(R('players')).once('value'));
+  await test('write rooms/'+ROOM+'/players',    ()=>db.ref(R('players/_diag')).set({name:'diag'}));
+
+  // the exact shapes the app actually writes
+  await test('UPDATE game_state (multi-key)', ()=>db.ref(R('game_state')).update({diagA:1, diagB:2}));
+  await test('UPDATE game_state (real payload)', ()=>db.ref(R('game_state')).update({
+    screen:'join', joinUrl:'https://example.com/?room='+ROOM, joinCount:0, seq:(GS?.seq||0)+1 }));
+  await test('UPDATE game_state (question shape)', ()=>db.ref(R('game_state')).update({
+    question:{key:'diag',text:'t',a:'1',b:'2',c:'3',d:'4',correct:'A',hide5050:'',explanation:''},
+    optionsVisible:false, lockedOption:null, reveal:'none', hidden5050:[],
+    timer:{running:false,paused:false,duration:30,startAt:0,left:30,label:'Ready'}, seq:(GS?.seq||0)+2 }));
+  await test('UPDATE mobile_state (real)', ()=>db.ref(R('mobile_state')).update({mode:'blank', seq:(MS?.seq||0)+1}));
+
+  // what is actually in there now?
+  try {
+    const s = await db.ref(R('game_state')).once('value');
+    say(null, 'game_state exists', s.exists() ? 'yes, keys: ' + Object.keys(s.val()||{}).join(',') : 'NO — empty');
+  } catch(e){ say(false, 'read game_state', e.code); }
+  say(null, 'GS in memory', GS ? 'loaded (seq ' + GS.seq + ')' : 'NULL — never loaded');
+  say(null, 'MS in memory', MS ? 'loaded' : 'NULL');
+
+  // tidy up the probes
+  try {
+    await db.ref(R('game_state/diagPing')).remove();
+    await db.ref(R('game_state/diagA')).remove();
+    await db.ref(R('game_state/diagB')).remove();
+    await db.ref(R('mobile_state/diagPing')).remove();
+    await db.ref(R('used/_diag')).remove();
+    await db.ref(R('players/_diag')).remove();
+  } catch(e){}
+
+  const fails = lines.filter(l=>l.startsWith('❌')).length;
+  say(null, '', '');
+  say(fails === 0, fails === 0 ? 'ALL CHECKS PASSED' : `${fails} CHECK(S) FAILED`);
+}
+function copyDiag(){
+  navigator.clipboard?.writeText(diagText).then(()=>toast('Copied — paste it to Claude'))
+    .catch(()=>toast('Select the text and copy manually', true));
+}
+
+/* ---------- PROJECTOR WINDOW ---------- */
+function projectorUrl(){
+  // same folder as this page: host.html -> screen.html, or the local server's PROJECTOR.html
+  const local = /PROJECTOR|NEWKBSHOST/i.test(location.pathname) || location.protocol === 'file:';
+  const file = local ? 'PROJECTOR.html' : 'screen.html';
+  const base = location.href.replace(/[^/]*(\?.*)?$/, '');
+  return base + file + '?room=' + ROOM;
+}
+function openProjector(){
+  const url = projectorUrl();
+  const w = window.open(url, 'kbs_projector_' + ROOM);
+  if(!w){
+    prompt('Pop-up was blocked. Copy this link and open it in a new tab:', url);
+    return;
+  }
+  w.focus();
+  toast('Projector opened — drag it to the projector screen, then press F11');
+  logLine('Projector window opened for ' + ROOM);
+}
+
+/* ---------- JOIN LINK / QR ---------- */
+const DEFAULT_JOIN_URL = 'https://kounbanegasiddhatma.web.app';
+function joinUrl(){ return ($('in-joinurl').value.trim() || DEFAULT_JOIN_URL).replace(/\/+$/,''); }
+function showJoinQR(){
+  const url = joinUrl();
+  if(!/^https?:\/\//.test(url)) return toast('Link must start with https://', true);
+  gsUpdate({screen:'join', joinUrl:url, joinCount:Object.keys(players).length});
+  logLine('Projector → join QR');
+  toast('QR is on the projector');
+}
+function copyJoinLink(){
+  const url = joinUrl();
+  navigator.clipboard?.writeText(url)
+    .then(()=>toast('Link copied'))
+    .catch(()=>toast(url, true));
+}
+
+/* ---------- AUDIENCE MANAGEMENT ---------- */
+function renderAudienceMgmt(){
+  const tb = $('tb-audience'); if(!tb) return;
+  const keys = Object.keys(players);
+  $('mgmt-count').textContent = keys.length;
+  tb.innerHTML = keys.length ? keys.map((uid,i)=>{
+    const p = players[uid];
+    return `<tr>
+      <td>${i+1}</td><td>${esc(p.name||'—')}</td><td>${p.age||'—'}</td>
+      <td>${esc(p.phone||'—')}</td><td>${esc(p.city||'—')}</td>
+      <td style="color:var(--green);font-weight:800">${p.score||0}</td>
+      <td><button class="b-red" style="padding:3px 7px;font-size:.72rem;display:inline-flex"
+            onclick="removeOneAudience('${uid}')">Remove</button></td></tr>`;
+  }).join('') : '<tr><td colspan="7" style="text-align:center;color:var(--tx-mut);padding:22px">Nobody has joined yet.</td></tr>';
+}
+function removeOneAudience(uid){
+  const p = players[uid];
+  if(!confirm(`Remove ${p?.name || 'this person'} from the audience?\n\nTheir phone will drop back to the join screen.`)) return;
+  db.ref(R('players/'+uid)).remove().then(()=>toast('Removed'));
+}
+function removeAllAudience(){
+  const n = Object.keys(players).length;
+  if(!n) return toast('Nobody has joined yet', true);
+  if(!confirm(`REMOVE ALL ${n} AUDIENCE MEMBERS?\n\n`
+    + `Every connected phone drops back to the join screen and all scores are wiped.\n\n`
+    + `Download the Excel file first if you want to keep their details.\n\nThis cannot be undone.`)) return;
+  if(!confirm(`Last check — really clear all ${n}?`)) return;
+  db.ref(R('players')).remove()
+    .then(()=>{ logLine(`Audience cleared (${n} removed)`); toast('Audience cleared — ready for a new show'); })
+    .catch(e=>toast('Failed: '+e.message, true));
+}
+function exportAudience(){
+  const keys = Object.keys(players);
+  if(!keys.length) return toast('Nobody has joined yet', true);
+  const q = v => {
+    const s = String(v == null ? '' : v);
+    return /[",\n]/.test(s) ? '"' + s.replace(/"/g,'""') + '"' : s;
+  };
+  const rows = [['#','Name','Age','Mobile','City','Score','Joined']];
+  keys.map(uid=>players[uid])
+      .sort((a,b)=>(b.score||0)-(a.score||0))
+      .forEach((p,i)=>rows.push([i+1, p.name||'', p.age||'', p.phone||'', p.city||'', p.score||0,
+        p.joinedAt ? new Date(p.joinedAt).toLocaleString('en-IN') : '']));
+  // BOM keeps Hindi names readable when Excel opens the file
+  const csv = '﻿' + rows.map(r=>r.map(q).join(',')).join('\r\n');
+  const url = URL.createObjectURL(new Blob([csv], {type:'text/csv;charset=utf-8'}));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `kbs-audience-${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+  toast(`${keys.length} audience rows downloaded`);
+}
+/* Wipe the room back to a clean starting state. The question bank is untouched. */
+function resetFullGame(){
+  const n = Object.keys(players).length;
+  if(!confirm(`RESET FULL GAME — room ${ROOM}\n\n`
+    + `• Contestant cleared, back to Level 1\n`
+    + `• All 4 lifelines restored\n`
+    + `• ${n} audience phone(s) disconnected, all scores wiped\n`
+    + `• Used-question marks cleared on all 14 levels\n`
+    + `• Screens back to the idle logo\n\n`
+    + `Your question bank is NOT touched.\n\nContinue?`)) return;
+  if(!confirm(`Last check — reset room ${ROOM} completely?`)) return;
+
+  clearPollTimers(); clearAudQTimers();
+  currentPollId = currentFFFId = currentAudQId = null;
+  lastFFFWinners = []; refreshFFFWinners();
+  pollTally = {A:0,B:0,C:0,D:0,total:0};
+  $('poll-res').innerHTML = '';
+  $('fff-info').textContent = 'No round running.';
+  $('aud-info').textContent = 'No question sent.';
+  $('s-resp').textContent = '0';
+
+  const fresh = {
+    screen:'idle', player:{name:'—', city:'', age:null}, level:1,
+    question:null, optionsVisible:false, lockedOption:null, reveal:'none',
+    hidden5050:[], pollInline:false, pollResult:null, leaderboard:null,
+    joinCount:0, joinUrl: joinUrl(),
+    lifelines:{'5050':false, poll:false, expert:false, call:false},
+    timer:{running:false, paused:false, duration:30, startAt:0, left:30, label:'Ready'},
+    audio:{cmd:'stop', seq:(GS?.audio?.seq||0)+1},
+    theme: GS?.theme || 'dark', muted: false, seq:(GS?.seq||0)+1
+  };
+
+  Promise.all([
+    db.ref(R('game_state')).set(fresh),
+    db.ref(R('mobile_state')).set({mode:'blank', seq:1}),
+    db.ref(R('players')).remove(),
+    db.ref(R('used')).remove(),
+    db.ref(R('poll_votes')).remove(),
+    db.ref(R('fff_answers')).remove(),
+    db.ref(R('audience_answers')).remove()
+  ]).then(()=>{
+    logLine(`FULL RESET — room ${ROOM} back to start (${n} audience removed)`);
+    toast('Game reset — ready for a new show');
+  }).catch(e=>toast('Reset failed: ' + e.message, true));
+}
+
+function hostSignOut(){
+  if(!confirm('Sign out of the host controller on this device?')) return;
+  auth.signOut().then(()=>location.reload());
+}
+
+function resetScores(){
+  if(!confirm('Reset every audience score to zero?\n\nPlayers stay joined, but all points are wiped. This cannot be undone.')) return;
+  const updates = {};
+  Object.keys(players).forEach(uid => updates[`${uid}/score`] = 0);
+  db.ref(R('players')).update(updates);
+  logLine('All audience scores reset');
+  toast('Scores reset');
+}
+
+/* ═══════════ CMS ═══════════ */
+function openCMS(){ $('cms').classList.add('open'); }
+function closeCMS(){ $('cms').classList.remove('open'); }
+function openHelp(){ $('sc-table').innerHTML = renderShortcutTable(); $('help').classList.add('open'); }
+function closeHelp(){ $('help').classList.remove('open'); }
+function tab(id, btn){
+  document.querySelectorAll('.pane').forEach(p=>p.style.display='none');
+  document.querySelectorAll('.tb').forEach(b=>b.classList.remove('active'));
+  $(id).style.display='block'; btn.classList.add('active');
+}
+
+/* --- LEVEL BANK --- */
+function saveLevelQ(){
+  const lvl = $('cms-lvl').value;
+  const q = {
+    text:$('q-text').value.trim(), a:$('q-a').value.trim(), b:$('q-b').value.trim(),
+    c:$('q-c').value.trim(), d:$('q-d').value.trim(),
+    correct:$('q-correct').value, hide5050:$('q-5050').value.trim().toUpperCase(),
+    explanation:$('q-exp').value.trim()
+  };
+  if(!q.text||!q.a||!q.b||!q.c||!q.d) return toast('Question and all 4 options are required', true);
+
+  const hides = (q.hide5050.match(/[ABCD]/g)||[]);
+  if(hides.includes(q.correct)) return toast(`50:50 cannot hide ${q.correct} — that is the correct answer`, true);
+  if(q.hide5050 && hides.length !== 2) return toast('50:50 needs exactly 2 letters, e.g. B, C', true);
+
+  const ref = editing.lvl
+    ? db.ref(`question_bank/levels/${lvl}/${editing.lvl}`).update(q)
+    : db.ref(`question_bank/levels/${lvl}`).push({...q, used:false});
+  ref.then(()=>{ toast(editing.lvl?'Question updated':'Question added'); clearLevelForm(); })
+     .catch(e=>toast('Save failed: '+e.message, true));
+}
+function clearLevelForm(){
+  editing.lvl = null;
+  ['q-text','q-a','q-b','q-c','q-d','q-5050','q-exp'].forEach(i=>$(i).value='');
+  $('lvl-form-title').textContent = 'Add New Question';
+  $('q-save').textContent = '💾 Add Question';
+}
+function editLevelQ(lvl,key){
+  const q = bank.levels[lvl]?.[key]; if(!q) return;
+  editing.lvl = key;
+  $('q-text').value=q.text; $('q-a').value=q.a; $('q-b').value=q.b; $('q-c').value=q.c; $('q-d').value=q.d;
+  $('q-correct').value=q.correct; $('q-5050').value=q.hide5050||''; $('q-exp').value=q.explanation||'';
+  $('lvl-form-title').textContent = '✏️ Editing Question';
+  $('q-save').textContent = '💾 Save Changes';
+  $('cms').querySelector('.mbody').scrollTop = 0;
+}
+function delLevelQ(lvl,key){
+  if(!confirm('Delete this question permanently?')) return;
+  db.ref(`question_bank/levels/${lvl}/${key}`).remove();
+}
+function renderLevelBank(){
+  const tb = $('tb-lvl'); if(!tb) return;
+  const lvl = $('cms-lvl').value;
+  const pool = bank.levels[lvl] || {};
+  const keys = Object.keys(pool);
+  if(!keys.length){
+    tb.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--tx-mut);padding:22px">No questions in this level yet.</td></tr>';
+    return;
+  }
+  tb.innerHTML = keys.map((k,i)=>{
+    const q = pool[k];
+    return `<tr>
+      <td>${i+1}</td><td>${esc(q.text)}</td>
+      <td style="color:var(--green);font-weight:800">${esc(q.correct)}</td>
+      <td>${esc(q.hide5050||'—')}</td>
+      <td><span style="color:${isUsed(lvl,k)?'var(--red)':'var(--green)'}">${isUsed(lvl,k)?'Used':'Available'}</span></td>
+      <td style="white-space:nowrap">
+        <button class="b-slate" style="padding:3px 7px;font-size:.72rem;display:inline-flex" onclick="editLevelQ('${lvl}','${k}')">Edit</button>
+        <button class="b-red" style="padding:3px 7px;font-size:.72rem;display:inline-flex;margin-left:4px" onclick="delLevelQ('${lvl}','${k}')">Del</button>
+      </td></tr>`;
+  }).join('');
+}
+function resetPool(){
+  const lvl = $('cms-lvl').value;
+  const keys = Object.keys(bank.levels[lvl] || {});
+  if(!keys.length) return toast('No questions in this level', true);
+  if(!confirm(`Mark all ${keys.length} questions in Level ${lvl} as unused again?\n\nOnly affects room ${ROOM}.`)) return;
+  db.ref(R(`used/${lvl}`)).remove().then(()=>toast(`Level ${lvl} pool reset in ${ROOM}`));
+}
+function resetAllPools(){
+  const total = Object.values(bank.levels || {}).reduce((a,o)=>a+Object.keys(o||{}).length, 0);
+  const usedN = Object.values(roomUsed || {}).reduce((a,o)=>a+Object.keys(o||{}).length, 0);
+  if(!total) return toast('The question bank is empty', true);
+  if(!confirm(`RESET ALL 14 LEVELS\n\n${usedN} of ${total} questions are currently marked used.\n`
+    + `All of them become available again.\n\nRoom: ${ROOM} only — other rooms are not affected.\n\nContinue?`)) return;
+  db.ref(R('used')).remove()
+    .then(()=>{ logLine(`All pools reset (${usedN} freed)`); toast(`All 14 levels reset in ${ROOM}`); })
+    .catch(e=>toast('Reset failed: '+e.message, true));
+}
+
+/* --- AUDIENCE BANK --- */
+function saveAudQ(){
+  const q = {
+    text:$('a-text').value.trim(), a:$('a-a').value.trim(), b:$('a-b').value.trim(),
+    c:$('a-c').value.trim(), d:$('a-d').value.trim(),
+    correct:$('a-correct').value, explanation:$('a-exp').value.trim()
+  };
+  if(!q.text||!q.a||!q.b||!q.c||!q.d) return toast('Question and all 4 options are required', true);
+  const ref = editing.aud
+    ? db.ref('question_bank/audience/'+editing.aud).update(q)
+    : db.ref('question_bank/audience').push({...q, used:false});
+  ref.then(()=>{ toast(editing.aud?'Updated':'Added to audience bank'); clearAudForm(); })
+     .catch(e=>toast('Save failed: '+e.message, true));
+}
+function clearAudForm(){
+  editing.aud = null;
+  ['a-text','a-a','a-b','a-c','a-d','a-exp'].forEach(i=>$(i).value='');
+  $('aud-form-title').textContent='Add New Audience Question';
+  $('a-save').textContent='💾 Add to Audience Bank';
+}
+function editAudQ(key){
+  const q = bank.audience[key]; if(!q) return;
+  editing.aud = key;
+  $('a-text').value=q.text; $('a-a').value=q.a; $('a-b').value=q.b; $('a-c').value=q.c; $('a-d').value=q.d;
+  $('a-correct').value=q.correct; $('a-exp').value=q.explanation||'';
+  $('aud-form-title').textContent='✏️ Editing Audience Question';
+  $('a-save').textContent='💾 Save Changes';
+  $('cms').querySelector('.mbody').scrollTop = 0;
+}
+function delAudQ(key){ if(confirm('Delete this audience question?')) db.ref('question_bank/audience/'+key).remove(); }
+function renderAudBank(){
+  const tb = $('tb-aud'); if(!tb) return;
+  const keys = Object.keys(bank.audience);
+  $('aud-n').textContent = keys.length + ' saved';
+  tb.innerHTML = keys.length ? keys.map((k,i)=>{
+    const q = bank.audience[k];
+    return `<tr><td>${i+1}</td><td>${esc(q.text)}</td>
+      <td style="font-size:.78rem;color:var(--tx-mut)">A:${esc(q.a)} · B:${esc(q.b)} · C:${esc(q.c)} · D:${esc(q.d)}</td>
+      <td style="color:var(--green);font-weight:800">${esc(q.correct)}</td>
+      <td style="white-space:nowrap">
+        <button class="b-slate" style="padding:3px 7px;font-size:.72rem;display:inline-flex" onclick="editAudQ('${k}')">Edit</button>
+        <button class="b-red" style="padding:3px 7px;font-size:.72rem;display:inline-flex;margin-left:4px" onclick="delAudQ('${k}')">Del</button>
+      </td></tr>`;
+  }).join('') : '<tr><td colspan="5" style="text-align:center;color:var(--tx-mut);padding:22px">No audience questions yet.</td></tr>';
+
+  const sel = $('sel-aud'), prev = sel.value;
+  sel.innerHTML = keys.length ? keys.map((k,i)=>`<option value="${k}">Q${i+1}: ${esc(bank.audience[k].text).slice(0,60)}</option>`).join('')
+                              : '<option value="">— no audience questions —</option>';
+  sel.value = prev;
+}
+
+/* --- FFF BANK --- */
+function addFFFRow(){
+  const box = $('f-items');
+  if(box.children.length >= 8) return toast('Maximum 8 options', true);
+  const n = box.children.length + 1;
+  const row = document.createElement('div');
+  row.style.cssText = 'display:flex;align-items:center;gap:9px';
+  row.innerHTML = `<span style="color:var(--gold);font-weight:800;width:24px;flex-shrink:0">${n}.</span>
+    <input type="text" class="f-item" placeholder="Position ${n} in the correct order">`;
+  box.appendChild(row);
+}
+function delFFFRow(){
+  const box = $('f-items');
+  if(box.children.length <= 2) return toast('Minimum 2 options', true);
+  box.lastElementChild.remove();
+}
+function setFFFRows(items){
+  $('f-items').innerHTML = '';
+  items.forEach(()=>addFFFRow());
+  document.querySelectorAll('.f-item').forEach((el,i)=>el.value = items[i]||'');
+}
+function saveFFFQ(){
+  const text = $('f-text').value.trim();
+  const boxes = [...document.querySelectorAll('.f-item')];
+  const items = boxes.map(b=>b.value.trim());
+  if(!text) return toast('Question text is required', true);
+  if(items.some(v=>!v)) return toast('Every option box must be filled (or remove the empty ones)', true);
+  if(items.length < 2) return toast('At least 2 options required', true);
+  if(new Set(items).size !== items.length) return toast('Two options are identical — ordering would be ambiguous', true);
+
+  const ref = editing.fff
+    ? db.ref('question_bank/fff/'+editing.fff).update({text, items})
+    : db.ref('question_bank/fff').push({text, items, used:false});
+  ref.then(()=>{ toast(editing.fff?'Updated':'Added to FFF bank'); clearFFFForm(); })
+     .catch(e=>toast('Save failed: '+e.message, true));
+}
+function clearFFFForm(){
+  editing.fff = null;
+  $('f-text').value = '';
+  $('f-items').innerHTML = '';
+  for(let i=0;i<4;i++) addFFFRow();
+  $('fff-form-title').textContent='Add New FFF Ordering Question';
+  $('f-save').textContent='💾 Add to FFF Bank';
+}
+function editFFFQ(key){
+  const q = bank.fff[key]; if(!q) return;
+  editing.fff = key;
+  $('f-text').value = q.text;
+  setFFFRows(q.items||[]);
+  $('fff-form-title').textContent='✏️ Editing FFF Question';
+  $('f-save').textContent='💾 Save Changes';
+  $('cms').querySelector('.mbody').scrollTop = 0;
+}
+function delFFFQ(key){ if(confirm('Delete this FFF question?')) db.ref('question_bank/fff/'+key).remove(); }
+function renderFFFBank(){
+  const tb = $('tb-fff'); if(!tb) return;
+  const keys = Object.keys(bank.fff);
+  $('fff-n').textContent = keys.length + ' saved';
+  tb.innerHTML = keys.length ? keys.map((k,i)=>{
+    const q = bank.fff[k], items = q.items||[];
+    return `<tr><td>${i+1}</td><td>${esc(q.text)}</td>
+      <td style="font-size:.78rem;color:var(--green)">${items.map((t,n)=>`${n+1}. ${esc(t)}`).join(' → ')}</td>
+      <td>${items.length}</td>
+      <td style="white-space:nowrap">
+        <button class="b-slate" style="padding:3px 7px;font-size:.72rem;display:inline-flex" onclick="editFFFQ('${k}')">Edit</button>
+        <button class="b-red" style="padding:3px 7px;font-size:.72rem;display:inline-flex;margin-left:4px" onclick="delFFFQ('${k}')">Del</button>
+      </td></tr>`;
+  }).join('') : '<tr><td colspan="5" style="text-align:center;color:var(--tx-mut);padding:22px">No FFF questions yet.</td></tr>';
+
+  const sel = $('sel-fff'), prev = sel.value;
+  sel.innerHTML = keys.length ? keys.map((k,i)=>`<option value="${k}">FFF ${i+1}: ${esc(bank.fff[k].text).slice(0,60)}</option>`).join('')
+                              : '<option value="">— no FFF questions —</option>';
+  sel.value = prev;
+}
+
+/* --- BACKUP / RESTORE --- */
+function exportBank(){
+  db.ref('question_bank').once('value').then(s=>{
+    const data = JSON.stringify({exportedAt:new Date().toISOString(), question_bank:s.val()||{}}, null, 2);
+    const url = URL.createObjectURL(new Blob([data],{type:'application/json'}));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `kbs-question-bank-${new Date().toISOString().slice(0,10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast('Backup downloaded');
+  });
+}
+function importBank(){
+  const f = $('io-file').files[0];
+  if(!f) return toast('Choose a .json backup file first', true);
+  const r = new FileReader();
+  r.onload = () => {
+    let data;
+    try { data = JSON.parse(r.result); }
+    catch(e){ return toast('That file is not valid JSON', true); }
+    const qb = data.question_bank || data;
+    if(!qb.levels && !qb.audience && !qb.fff) return toast('No question bank found in that file', true);
+    const counts = `${Object.values(qb.levels||{}).reduce((a,o)=>a+Object.keys(o||{}).length,0)} level Qs, `
+                 + `${Object.keys(qb.audience||{}).length} audience Qs, ${Object.keys(qb.fff||{}).length} FFF Qs`;
+    if(!confirm(`RESTORE BACKUP\n\nThis file contains: ${counts}\n\n`
+      + `⚠️ Everything currently in your question bank will be DELETED and replaced.\n\nContinue?`)) return;
+    db.ref('question_bank').set(qb)
+      .then(()=>toast('Bank restored'))
+      .catch(e=>toast('Restore failed: '+e.message, true));
+  };
+  r.readAsText(f);
+}
+
+/* ---------- KEYBOARD ---------- */
+/* A clicked button keeps focus, and the browser re-fires it on Space —
+   which is why Space was repeating the last button instead of pausing. */
+document.addEventListener('click', e=>{
+  const b = e.target.closest('button');
+  if(b) b.blur();
+});
+
+const KEYMAP = {
+  // question sequence
+  '1':['Show question (options hidden)', ()=>showQuestion()],
+  '2':['Reveal options + start timer',   ()=>revealOptions(true)],
+  '3':['Reveal answer — CORRECT',        ()=>reveal('correct')],
+  '4':['Reveal answer — WRONG',          ()=>reveal('wrong')],
+  '5':['Start / resume timer',           ()=>timerStart()],
+  '6':['Show level ladder',              ()=>setScreen('ladder')],
+  '7':['Show explanation',               ()=>setScreen('explanation')],
+  '8':['Show certificate',               ()=>setScreen('certificate')],
+  '9':['Idle logo screen',               ()=>setScreen('idle')],
+  '0':['Blank all audience phones',      ()=>mobileMode('blank')],
+  // locking
+  'A':['Lock A', ()=>lockAnswer('A')],
+  'B':['Lock B', ()=>lockAnswer('B')],
+  'C':['Lock C', ()=>lockAnswer('C')],
+  'D':['Lock D', ()=>lockAnswer('D')],
+  'X':['Clear the lock', ()=>lockAnswer(null)],
+  // questions & levels
+  'L':['Load random unused question', ()=>loadRandomQuestion()],
+  'N':['Next level',     ()=>changeLevel(1)],
+  'P':['Previous level', ()=>changeLevel(-1)],
+  // lifelines
+  'Z':['Lifeline — 50:50',           ()=>useLifeline('5050')],
+  'V':['Lifeline — audience Vote',   ()=>useLifeline('poll')],
+  'E':['Lifeline — Expert',          ()=>useLifeline('expert')],
+  'H':['Lifeline — pHone a friend',  ()=>useLifeline('call')],
+  // audience screens
+  'Q':['Show join QR on projector',  ()=>showJoinQR()],
+  'F':['Send FFF to phones',         ()=>fffStart()],
+  'G':['Pin poll graph beside question', ()=>pollShowInline()],
+  // utility
+  'R':['Reset timer',        ()=>timerReset()],
+  'W':['Walk away',          ()=>walkAway()],
+  'M':['Mute / unmute',      ()=>toggleMute()],
+  'T':['Light / dark theme', ()=>toggleTheme()],
+  'O':['Open projector window', ()=>openProjector()]
+};
+
+function bindKeys(){
+  document.addEventListener('keydown', e=>{
+    if(e.key === 'Escape'){ closeCMS(); closeHelp(); $('diag').classList.remove('open'); return; }
+    const t = e.target.tagName;
+    if(t === 'INPUT' || t === 'TEXTAREA' || t === 'SELECT') return;
+    if(e.target.isContentEditable) return;
+    if($('cms').classList.contains('open') || $('help').classList.contains('open')
+       || $('diag').classList.contains('open')) return;
+    if(e.ctrlKey || e.altKey || e.metaKey) return;
+
+    // Space = pause/resume, and never the last-clicked button
+    if(e.code === 'Space' || e.key === ' '){
+      e.preventDefault();
+      if(document.activeElement && document.activeElement.blur) document.activeElement.blur();
+      GS?.timer?.running ? timerPause() : timerStart();
+      return;
+    }
+    if(e.key === '?' || e.key === '/'){ e.preventDefault(); openHelp(); return; }
+
+    const entry = KEYMAP[e.key.toUpperCase()];
+    if(entry){ e.preventDefault(); entry[1](); }
+  });
+}
+function renderShortcutTable(){
+  const groups = [
+    ['Question sequence', ['1','2','3','4','5']],
+    ['Screens',           ['6','7','8','9','0','Q','G']],
+    ['Lock answer',       ['A','B','C','D','X']],
+    ['Questions & levels',['L','N','P']],
+    ['Lifelines',         ['Z','V','E','H']],
+    ['Audience',          ['F']],
+    ['Utility',           ['R','W','M','T','O']]
+  ];
+  return groups.map(([title, keys])=>
+    `<tr><td colspan="2" style="background:var(--bg-sub);color:var(--gold);font-weight:800;
+      font-size:.78rem;letter-spacing:.6px;text-transform:uppercase">${title}</td></tr>` +
+    keys.map(k=>`<tr><td style="width:70px"><b>${k}</b></td><td>${esc(KEYMAP[k][0])}</td></tr>`).join('')
+  ).join('') +
+  `<tr><td colspan="2" style="background:var(--bg-sub);color:var(--gold);font-weight:800;
+     font-size:.78rem;letter-spacing:.6px;text-transform:uppercase">Always</td></tr>
+   <tr><td><b>Space</b></td><td>Pause / resume the timer</td></tr>
+   <tr><td><b>?</b></td><td>Open this list</td></tr>
+   <tr><td><b>Esc</b></td><td>Close any dialog</td></tr>`;
+}
+</script>
+</body>
+</html>

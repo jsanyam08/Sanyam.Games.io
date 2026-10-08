@@ -1,0 +1,116 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+
+    "admins": {
+      ".read": false,
+      ".write": false,
+      "$uid": {
+        ".read": "auth.uid === $uid",
+        ".write": false
+      }
+    },
+
+    "question_bank": {
+      ".read": "root.child('admins').child(auth.uid).val() === true",
+      ".write": "root.child('admins').child(auth.uid).val() === true"
+    },
+
+    "rooms_index": {
+      ".read": "auth != null",
+      ".write": "root.child('admins').child(auth.uid).val() === true"
+    },
+
+    "rooms": {
+      ".read": "root.child('admins').child(auth.uid).val() === true",
+      ".write": "root.child('admins').child(auth.uid).val() === true",
+
+      "$room": {
+        ".write": "root.child('admins').child(auth.uid).val() === true",
+
+        "meta": {
+          ".read": "auth != null",
+          ".write": "root.child('admins').child(auth.uid).val() === true",
+          "name":      { ".validate": "newData.isString() && newData.val().length <= 60" },
+          "createdAt": { ".validate": "newData.isNumber()" },
+          "owner":     { ".validate": "newData.isString() && newData.val().length <= 128" },
+          "$other":    { ".validate": false }
+        },
+
+        "game_state": {
+          ".read": "auth != null",
+          ".write": "root.child('admins').child(auth.uid).val() === true"
+        },
+
+        "mobile_state": {
+          ".read": "auth != null",
+          ".write": "root.child('admins').child(auth.uid).val() === true"
+        },
+
+        "used": {
+          ".read": "root.child('admins').child(auth.uid).val() === true",
+          ".write": "root.child('admins').child(auth.uid).val() === true"
+        },
+
+        "players": {
+          ".read": "root.child('admins').child(auth.uid).val() === true",
+          ".write": "root.child('admins').child(auth.uid).val() === true",
+          "$uid": {
+            ".read": "auth.uid === $uid",
+            ".write": "auth.uid === $uid || root.child('admins').child(auth.uid).val() === true",
+            ".validate": "!newData.exists() || newData.hasChildren(['name'])",
+            "name":     { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 40" },
+            "city":     { ".validate": "newData.isString() && newData.val().length <= 40" },
+            "age":      { ".validate": "newData.isNumber() && newData.val() >= 3 && newData.val() <= 120" },
+            "phone":    { ".validate": "newData.isString() && newData.val().matches(/^[0-9]{10,15}$/)" },
+            "score":    { ".validate": "newData.isNumber()" },
+            "joinedAt": { ".validate": "newData.isNumber()" },
+            "$other":   { ".validate": false }
+          }
+        },
+
+        "fff_answers": {
+          ".read": "root.child('admins').child(auth.uid).val() === true",
+          "$roundId": {
+            "$uid": {
+              ".read": "auth.uid === $uid",
+              ".write": "auth.uid === $uid && !data.exists()",
+              ".validate": "newData.hasChildren(['order','at'])",
+              "order": { ".validate": "newData.hasChildren()" },
+              "at":    { ".validate": "newData.isNumber()" },
+              "name":  { ".validate": "newData.isString() && newData.val().length <= 40" },
+              "$other": { ".validate": false }
+            }
+          }
+        },
+
+        "poll_votes": {
+          ".read": "root.child('admins').child(auth.uid).val() === true",
+          "$pollId": {
+            "$uid": {
+              ".read": "auth.uid === $uid",
+              ".write": "auth.uid === $uid && !data.exists()",
+              ".validate": "newData.isString() && newData.val().matches(/^[ABCD]$/)"
+            }
+          }
+        },
+
+        "audience_answers": {
+          ".read": "root.child('admins').child(auth.uid).val() === true",
+          "$questionId": {
+            "$uid": {
+              ".read": "auth.uid === $uid",
+              ".write": "auth.uid === $uid && !data.exists()",
+              ".validate": "newData.hasChildren(['ans','at'])",
+              "ans":  { ".validate": "newData.isString() && newData.val().matches(/^[ABCD]$/)" },
+              "at":   { ".validate": "newData.isNumber()" },
+              "name": { ".validate": "newData.isString() && newData.val().length <= 40" },
+              "$other": { ".validate": false }
+            }
+          }
+        }
+      }
+    }
+  }
+}

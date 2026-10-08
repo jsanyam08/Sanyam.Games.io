@@ -1,0 +1,239 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard — Sarvodaya Ahinsa</title>
+
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+<link rel="stylesheet" href="assets/ui.css?v=1790175980">
+
+<style>
+.vcard{border-left:4px solid var(--primary)}
+.vcard.stale{border-left-color:var(--bd-lt);opacity:.75}
+.big{font:800 30px/1 var(--fd);color:var(--primary)}
+.mini{display:grid;grid-template-columns:repeat(10,1fr);gap:2px}
+.mini div{aspect-ratio:1;border-radius:3px;background:var(--panel-2)}
+.mini div.on{background:var(--primary)}
+</style>
+</head>
+<body>
+
+<div id="demo-slot"></div>
+<div id="hdr-slot-outer"></div>
+
+<div class="wrap" style="padding:16px 0">
+  <div id="stage"></div>
+</div>
+
+<div id="toast"></div>
+
+<script src="assets/brand.js?v=1790175980"></script>
+<script src="assets/i18n.js?v=1790175980"></script>
+<script src="assets/theme.js?v=1790175980"></script>
+<script src="assets/text.js?v=1790175980"></script>
+<script src="assets/fb.js?v=1790175980"></script>
+<script src="assets/engine.js?v=1790175980"></script>
+<script src="assets/types/quiz.js?v=1790175980"></script>
+<script src="assets/types/jumble.js?v=1790175980"></script>
+<script src="assets/types/buzzer.js?v=1790175980"></script>
+<script src="assets/types/tambola.js?v=1790175980"></script>
+<script src="assets/types/match.js?v=1790175980"></script>
+<script src="assets/types/custom.js?v=1790175980"></script>
+<script>
+/* ═══ डैशबोर्ड ═══════════════════════════════════════════════════
+   Every venue of one show, side by side. Read-mostly: the only things
+   it writes are the two decisions that belong to whoever is watching
+   all the halls at once — sync everybody, and combine the leaderboard.
+   ═══════════════════════════════════════════════════════════════ */
+
+const $ = SA.$;
+let SID = SA.qs('s');
+let INFO = null, VENUES = {}, LIVE = {}, PLAYERS = {}, TEAMS = {}, PRESENT = {};
+let grp = null;
+
+$('demo-slot').innerHTML = SA.ui.demoBanner();
+$('hdr-slot-outer').innerHTML = SA.ui.header({ title: SA.t('db.title') });
+SA.ui.wireMode(() => { if (INFO) paint(); });
+
+SA.ui.requireAdmin().then(() => {
+  $('hdr-slot').innerHTML = `<a class="btn sm ghost" href="host.html">🎛️ ${SA.esc(SA.t('home.host_panel'))}</a> ${SA.ui.accountChip()}`;
+  SA.ui.wireAccount();
+  SID ? open(SID) : chooser();
+});
+
+async function chooser() {
+  const sessions = await SA.db.ref('sa/sessions').once();
+  const rows = Object.entries(sessions || {})
+    .map(([id, s]) => Object.assign({ id }, s.info || {}, { venues: Object.keys(s.venues || {}).length }))
+    .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  $('stage').innerHTML = `
+    <div class="card col" style="gap:11px;max-width:760px;margin:0 auto">
+      <label class="f" style="margin:0">${SA.t('db.which_show')}</label>
+      ${rows.length ? rows.map(s => `
+        <button class="gitem vrow" data-s="${s.id}" style="display:flex;align-items:center;gap:10px;
+          padding:11px;border-radius:9px;background:var(--panel-2);border:1px solid var(--bd);
+          cursor:pointer;color:var(--tx);width:100%">
+          <span class="dot ${s.status === 'live' ? 'live' : ''}"></span>
+          <span class="grow" style="text-align:left"><b>${SA.esc(s.title)}</b>
+            <span class="sm mut" style="display:block">${SA.t('host.code_word')} ${SA.esc(s.code)} · ${s.venues} ${SA.t('db.venues_n')} ·
+              ${new Date(s.createdAt || 0).toLocaleString(SA.i18n.lang === 'hi' ? 'hi-IN' : 'en-IN')}</span></span>
+          <span class="pill p">${SA.t('open')}</span>
+        </button>`).join('') : `<div class="mut sm">${SA.t('db.no_shows')}</div>`}
+    </div>`;
+  $('stage').querySelectorAll('[data-s]').forEach(b => b.onclick = () => open(b.dataset.s));
+}
+
+async function open(sid) {
+  SID = sid;
+  history.replaceState(null, '', '?s=' + sid);
+  if (grp) grp.off();
+  grp = SA.db.group();
+  grp.on(SA.sess.P(sid) + '/info',    i => { INFO = i; if (i && i.theme) SA.theme.apply(i.theme, SA.theme.savedMode()); paint(); });
+  grp.on(SA.sess.P(sid) + '/venues',  v => { VENUES = v || {}; paint(); });
+  grp.on(SA.sess.P(sid) + '/live',    l => { LIVE = l || {}; paint(); });
+  grp.on(SA.sess.P(sid) + '/teams',   t => { TEAMS = t || {}; paint(); });
+  grp.on(SA.sess.P(sid) + '/players', p => { PLAYERS = p || {}; paint(); });
+  grp.on(SA.sess.P(sid) + '/present', p => { PRESENT = p || {}; paint(); });
+}
+
+function paint() {
+  if (!INFO) return;
+  const vids = Object.keys(VENUES);
+  const total = Object.keys(PLAYERS).length;
+  const combined = SA.sess.board(PLAYERS, null, 10);
+
+  $('stage').innerHTML = `
+    <div class="col" style="gap:14px">
+
+      <div class="card spread wrap-r" style="gap:12px">
+        <div class="row" style="gap:12px">
+          <span style="font-size:30px">${SA.esc(INFO.icon || '🎯')}</span>
+          <div>
+            <div style="font:800 20px/1.2 var(--fd)">${SA.esc(INFO.title)}</div>
+            <div class="sm mut">${SA.t('host.code_word')} <b style="color:var(--primary);letter-spacing:.18em">${SA.esc(INFO.code)}</b>
+              · ${vids.length} ${SA.t('db.venues_n')} · ${total} ${SA.t('players')}</div>
+          </div>
+        </div>
+        <div class="row wrap-r" style="gap:8px">
+          <label class="chk"><input type="checkbox" id="comb" ${INFO.combinedBoard ? 'checked' : ''}>
+            ${SA.t('db.combined')}</label>
+          <span class="pill ${INFO.status === 'live' ? 'ok' : ''}">${
+            INFO.status === 'live' ? SA.t('live') : SA.esc(INFO.status || '')}</span>
+        </div>
+      </div>
+
+      <div class="grid g2">
+        ${vids.map(vid => venueCard(vid)).join('') || `<div class="mut sm">${SA.t('db.no_venues')}</div>`}
+      </div>
+
+      <div class="card col" style="gap:10px">
+        <div class="spread"><span class="xs mut">🏆 ${SA.t('db.combined_t')}</span>
+          <button class="btn sm ghost" id="csv">⬇ CSV</button></div>
+        ${SA.render.leaderboard(combined)}
+      </div>
+    </div>`;
+
+  $('comb').onchange = e => SA.db.ref(SA.sess.P(SID) + '/info').update({ combinedBoard: e.target.checked });
+
+  $('csv').onclick = () => {
+    const rows = SA.sess.board(PLAYERS, null, 9999);
+    const csv = 'name,city,phone,age,venue,score\n' + rows.map(r =>
+      [r.name, r.city || '', r.phone || '', r.age || '', (VENUES[r.venueId] || {}).name || '', r.score || 0]
+        .map(v => '"' + String(v).replace(/"/g, '""') + '"').join(',')).join('\n');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' }));
+    a.download = (INFO.title || 'scores') + '-all-venues.csv';
+    a.click();
+  };
+
+  $('stage').querySelectorAll('[data-sync]').forEach(b => b.onclick = async () => {
+    if (!await SA.ui.confirm(SA.t('db.sync_q'), SA.t('db.sync_body'), SA.t('host.sync_yes'))) return;
+    const n = await SA.sess.syncAll(SID, b.dataset.sync);
+    SA.toast(SA.t('db.synced', { x: n }));
+  });
+  $('stage').querySelectorAll('[data-blank]').forEach(b => b.onclick = () =>
+    SA.sess.setLive(SID, b.dataset.blank, { screen: 'blank' }));
+}
+
+function venueCard(vid) {
+  const v = VENUES[vid] || {};
+  const l = LIVE[vid] || {};
+  const n = Object.values(PLAYERS).filter(p => p.venueId === vid).length;
+  const board = SA.sess.board(PLAYERS, vid, 3);
+  const teams = Object.values(TEAMS[vid] || {}).sort((a, b) => (b.score || 0) - (a.score || 0));
+  const present = Object.values(PRESENT[vid] || {});
+  const hostOn = present.some(p => p.role === 'host');
+  const screenOn = present.some(p => p.role === 'screen');
+  const round = l.roundMeta || {};
+  const drawn = (l.drawn || []).length;
+
+  const phase = l.phase ? SA.t('r.phase.' + l.phase) : '—';
+
+  return `
+    <div class="card vcard ${hostOn ? '' : 'stale'} col" style="gap:11px">
+      <div class="spread">
+        <div><div style="font:800 17px/1.2 var(--fd)">${SA.esc(v.name || '—')}</div>
+          ${v.city ? `<div class="sm mut">${SA.esc(v.city)}</div>` : ''}</div>
+        <div class="col" style="gap:4px;align-items:flex-end">
+          <span class="pill ${hostOn ? 'ok' : ''}" style="font-size:10px">
+            <span class="dot ${hostOn ? 'live' : 'off'}"></span>${SA.t('db.host_dot')}</span>
+          <span class="pill ${screenOn ? 'ok' : ''}" style="font-size:10px">
+            <span class="dot ${screenOn ? 'live' : 'off'}"></span>${SA.t('db.screen_dot')}</span>
+        </div>
+      </div>
+
+      <div class="sub">
+        <div class="spread"><span class="xs mut">${SA.esc(round.title || SA.t('db.no_round'))}</span>
+          <span class="pill">${SA.esc(phase)}</span></div>
+        ${round.type === 'tambola'
+          ? `<div class="mini" style="margin-top:9px">
+               ${Array.from({ length: 90 }, (_, i) =>
+                 `<div class="${(l.drawn || []).some(d => d.n === i + 1) ? 'on' : ''}"></div>`).join('')}
+             </div>
+             <div class="sm mut" style="margin-top:6px">${SA.t('db.drawn_n', { x: drawn })}</div>`
+          : `<div class="sm" style="margin-top:7px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+               ${SA.esc((l.payload && (l.payload.q || l.payload.title || l.payload.text || l.payload.scrambled)) || '—')}</div>`}
+      </div>
+
+      <div class="row wrap-r" style="gap:8px">
+        <span class="col" style="gap:0"><span class="big">${n}</span>
+          <span class="xs mut">${SA.t('players')}</span></span>
+        ${teams.length ? `<span class="col" style="gap:0">
+          <span class="big" style="color:${teams[0].colour}">${teams[0].score || 0}</span>
+          <span class="xs mut">${SA.esc(teams[0].name)}</span></span>` : ''}
+        ${board.length ? `<span class="col grow" style="gap:0;min-width:0">
+          <span class="sm" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+            <b>${SA.esc(board[0].name)}</b></span>
+          <span class="xs mut">${board[0].score || 0} ${SA.t('points')} · ${SA.t('db.leading')}</span></span>` : ''}
+      </div>
+
+      <div class="row wrap-r" style="gap:6px">
+        <a class="btn sm p" href="host.html?s=${SID}&v=${vid}">🎛️ ${SA.t('db.run_it')}</a>
+        <a class="btn sm ghost" href="screen.html?s=${SID}&v=${vid}" target="_blank">↗ ${SA.t('db.screen_dot')}</a>
+        <button class="btn sm ghost" data-sync="${vid}">⇉ ${SA.t('db.sync_all')}</button>
+        <button class="btn sm ghost" data-blank="${vid}">⬛</button>
+      </div>
+    </div>`;
+}
+</script>
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

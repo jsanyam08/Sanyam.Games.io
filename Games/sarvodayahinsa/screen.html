@@ -1,0 +1,343 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Projector — Sarvodaya Ahinsa</title>
+
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+<link rel="stylesheet" href="assets/ui.css?v=1790175980">
+
+<style>
+html,body{overflow:hidden;height:100%}
+#screen{position:fixed;inset:0;display:flex;flex-direction:column}
+#stage{flex:1;min-height:0;overflow:hidden}
+#bar{
+  display:flex;align-items:center;gap:14px;padding:8px 20px;
+  border-top:1px solid var(--bd);background:var(--panel);
+  font-size:clamp(11px,1vw,16px);
+}
+#bar img{height:clamp(24px,2.4vw,42px)}
+#blank{position:fixed;inset:0;background:#000;z-index:60;display:none}
+#tmr{
+  position:fixed;top:clamp(14px,2vw,30px);right:clamp(14px,2vw,30px);z-index:50;
+  display:none;
+}
+#idle-note{position:fixed;bottom:60px;left:0;right:0;text-align:center;font-size:13px;color:var(--tx-mut)}
+@media(max-width:700px){#bar{padding:6px 12px}}
+
+/* the corner QR stays up the whole show so a latecomer can always join */
+#qr-corner{
+  position:fixed;z-index:45;right:clamp(12px,1.6vw,26px);bottom:clamp(58px,6vh,86px);
+  width:clamp(88px,9vw,170px);padding:7px;border-radius:12px;
+  background:#fff;box-shadow:0 8px 28px rgba(0,0,0,.45);display:none;
+}
+#qr-corner .cap{
+  font:800 9px/1.3 var(--fd);color:#111;text-align:center;letter-spacing:.06em;
+  text-transform:uppercase;margin-top:4px;
+}
+#bar .barqr{width:clamp(30px,2.6vw,46px);background:#fff;padding:2px;border-radius:5px;flex:none}
+</style>
+</head>
+<body class="screen-mode">
+
+<div id="screen">
+  <div id="stage"></div>
+  <div id="bar">
+    <img id="bar-logo" alt="">
+    <div>
+      <div style="font-weight:800" id="bar-name">सर्वोदय अहिंसा</div>
+      <div class="mut" style="font-size:.72em;letter-spacing:.12em" id="bar-venue"></div>
+    </div>
+    <div style="flex:1"></div>
+    <div class="tc">
+      <div class="mut" style="font-size:.7em;letter-spacing:.14em" id="bar-codel"></div>
+      <div style="font-weight:800;letter-spacing:.2em;color:var(--primary)" id="bar-code">—</div>
+    </div>
+    <div style="flex:1"></div>
+    <div class="row" style="gap:8px"><span class="dot" id="bar-dot"></span>
+      <span class="mut" id="bar-n">0</span></div>
+  </div>
+</div>
+
+<div id="qr-corner"><div id="qr-corner-img"></div><div class="cap" id="qr-corner-cap"></div></div>
+<div id="tmr"></div>
+<div id="blank"></div>
+<div id="toast"></div>
+
+<script src="assets/brand.js?v=1790175980"></script>
+<script src="assets/i18n.js?v=1790175980"></script>
+<script src="assets/qr.js?v=1790175980"></script>
+<script src="assets/theme.js?v=1790175980"></script>
+<script src="assets/text.js?v=1790175980"></script>
+<script src="assets/fb.js?v=1790175980"></script>
+<script src="assets/engine.js?v=1790175980"></script>
+<script src="assets/types/quiz.js?v=1790175980"></script>
+<script src="assets/types/jumble.js?v=1790175980"></script>
+<script src="assets/types/buzzer.js?v=1790175980"></script>
+<script src="assets/types/tambola.js?v=1790175980"></script>
+<script src="assets/types/match.js?v=1790175980"></script>
+<script src="assets/types/custom.js?v=1790175980"></script>
+<script>
+/* ═══ प्रोजेक्टर ═════════════════════════════════════════════════
+   Reads only. It never writes a single value, which means it can be
+   refreshed at any moment mid-show and will land back exactly where
+   the room is. If the internet drops, whatever is on screen stays on
+   screen rather than collapsing to an error.
+   ═══════════════════════════════════════════════════════════════ */
+
+const $ = SA.$;
+let SID = SA.qs('s'), VID = SA.qs('v');
+let INFO = null, LIVE = {}, PLAYERS = {}, TEAMS = {}, VENUE = null;
+let tick = null, lastSig = '';
+
+$('bar-logo').src = SA.brand.logo;
+$('bar-name').textContent = SA.brand.name;
+$('bar-codel').textContent = SA.t('host.code_word');
+SA.theme.apply(null, SA.theme.savedMode());
+
+/* one click anywhere unlocks audio and goes full screen — the two things
+   a projector PC always needs and always forgets */
+document.body.addEventListener('click', () => {
+  if (!document.fullscreenElement && document.documentElement.requestFullscreen)
+    document.documentElement.requestFullscreen().catch(() => {});
+}, { once: true });
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'f' || e.key === 'F') {
+    document.fullscreenElement ? document.exitFullscreen()
+                               : document.documentElement.requestFullscreen().catch(() => {});
+  }
+});
+
+/* The link a phone camera should land on. It carries the venue, so a
+   person scanning the Jaipur screen joins Jaipur, not the main stage. */
+function joinURL() {
+  if (!INFO) return '';
+  const base = location.origin + location.pathname.replace(/screen\.html$/, '').replace(/\/screen$/, '/');
+  return base + '?c=' + encodeURIComponent(INFO.code || '') + (VID ? '&v=' + encodeURIComponent(VID) : '');
+}
+
+let qrCache = { url: '', svg: '' };
+function qrSVG() {
+  const url = joinURL();
+  if (!url) return '';
+  if (qrCache.url !== url) {
+    try { qrCache = { url, svg: SA.qr.svg(url) }; }
+    catch (e) { console.warn('[SA] QR failed', e); qrCache = { url, svg: '' }; }
+  }
+  return qrCache.svg;
+}
+
+function paintCornerQR() {
+  const box = $('qr-corner');
+  const on = LIVE.qrCorner !== false && INFO && INFO.code && (LIVE.screen || 'logo') !== 'qr';
+  box.style.display = on ? 'block' : 'none';
+  if (!on) return;
+  if (!box.dataset.url || box.dataset.url !== joinURL()) {
+    $('qr-corner-img').innerHTML = qrSVG();
+    $('qr-corner-cap').textContent = INFO.code;
+    box.dataset.url = joinURL();
+  }
+}
+
+function waiting(msg) {
+  $('stage').innerHTML = `<div class="col center" style="height:100%;gap:20px">
+    <img src="${SA.brand.logo}" style="width:min(280px,34vw);opacity:.85" alt="">
+    <div style="font:800 clamp(20px,2.4vw,40px)/1.2 var(--fd);color:var(--primary)">${SA.esc(SA.brand.name)}</div>
+    <div class="mut">${SA.esc(msg)}</div></div>`;
+}
+
+waiting(SA.t('connecting'));
+
+if (!SID) {
+  waiting(SA.t('sc.open_from'));
+} else if (SA.DEMO) {
+  start();
+} else {
+  SA.auth.onUser(u => { if (u) start(); else SA.auth.signInAnon().catch(e => waiting(SA.auth.errText(e))); });
+}
+
+async function start() {
+  INFO = await SA.db.ref(SA.sess.P(SID) + '/info').once();
+  if (!INFO) { waiting(SA.t('host.not_found')); return; }
+  /* A projector signs in anonymously, so it cannot read sa/games at all.
+     Everything it needs — the look, the round shape, the current item —
+     rides along on the session and the live node. */
+  SA.theme.apply(INFO.theme || null, 'dark');
+  $('bar-code').textContent = INFO.code || '—';
+
+  const venues = await SA.db.ref(SA.sess.P(SID) + '/venues').once();
+  if (!VID) VID = Object.keys(venues || {})[0] || '';
+  VENUE = (venues || {})[VID] || null;
+  $('bar-venue').textContent = VENUE ? (VENUE.name + (VENUE.city ? ' · ' + VENUE.city : '')) : '';
+
+  /* follow the look live, so re-theming a game in the Studio reaches the
+     projector the moment the host reopens the show */
+  SA.db.ref(SA.sess.P(SID) + '/info').on(i => {
+    if (!i) return;
+    const reTheme = JSON.stringify(i.theme || null) !== JSON.stringify((INFO || {}).theme || null);
+    INFO = i;
+    $('bar-code').textContent = i.code || '—';
+    if (reTheme) { SA.theme.apply(i.theme || null, LIVE.screenMode === 'light' ? 'light' : 'dark'); lastSig = ''; qrCache = { url: '', svg: '' }; render(); }
+  });
+
+  SA.db.ref(SA.sess.P(SID) + '/live/' + VID).on(l => {
+    const prevMode = LIVE.screenMode;
+    LIVE = l || {};
+    /* the host decides whether the hall wants a dark or a light screen */
+    if (LIVE.screenMode !== prevMode) {
+      SA.theme.apply((INFO && INFO.theme) || null, LIVE.screenMode === 'light' ? 'light' : 'dark');
+      lastSig = '';
+    }
+    $('bar-n').textContent = LIVE.boardN || 0;
+    render();
+  });
+  SA.db.ref(SA.sess.P(SID) + '/teams/' + VID).on(t => { TEAMS = t || {}; render(); });
+  /* No listener on /players. A projector signs in anonymously and the
+     rules refuse it that node outright — it holds everybody's mobile
+     number. The board and the head count arrive on the live node, put
+     there by the host; see publishBoard in engine.js. */
+  if (!SA.DEMO) SA.db.ref('.info/connected').on(v =>
+    $('bar-dot').className = 'dot ' + (v ? 'live' : 'off'));
+  else $('bar-dot').className = 'dot live';
+
+  SA.sess.presence(SID, VID, 'screen');
+  startTick();
+}
+
+function render() {
+  const screen = LIVE.screen || 'logo';
+  $('blank').style.display = screen === 'blank' ? 'block' : 'none';
+  /* a blacked-out screen means blacked out — the QR goes too */
+  if (screen === 'blank') { $('qr-corner').style.display = 'none'; return; }
+
+  const round = LIVE.roundMeta || null;
+
+  /* Redrawing on every keystroke of a host's typing would restart the
+     pop-in animations, so only repaint when something visible changed. */
+  paintCornerQR();
+
+  const sig = JSON.stringify([screen, LIVE.phase, LIVE.reveal, LIVE.payload, LIVE.top, LIVE.qtopAt,
+                              (LIVE.drawn || []).length, LIVE.showTally, LIVE.showHint, LIVE.lucky,
+                              LIVE.won, LIVE.level, LIVE.qrCorner,
+                              screen === 'leaderboard' ? LIVE.board : 0,
+                              screen === 'teams' ? Object.values(TEAMS).map(t => t.score) : 0]);
+  if (sig === lastSig) { paintTimer(); return; }
+  lastSig = sig;
+
+  /* a whole screen of QR — what you put up while the room is filling */
+  if (screen === 'qr') {
+    $('stage').innerHTML = `
+      <div class="col center" style="height:100%;gap:2.2vh;padding:2vh 3vw">
+        <div style="font:800 clamp(22px,2.8vw,50px)/1.2 var(--fd);color:var(--primary)">
+          ${SA.esc(SA.t('sc.scan'))}</div>
+        <div style="background:#fff;padding:clamp(10px,1.2vw,22px);border-radius:18px;
+                    width:min(52vh,52vw);box-shadow:0 14px 50px rgba(0,0,0,.5)">${qrSVG()}</div>
+        <div class="mut" style="font-size:clamp(12px,1.1vw,20px);letter-spacing:.1em">
+          ${SA.esc(SA.t('sc.or_code'))}</div>
+        <div style="font:800 clamp(34px,5vw,86px)/1 var(--fd);letter-spacing:.22em;color:var(--primary);
+                    text-shadow:0 0 40px var(--glow)">${SA.esc((INFO && INFO.code) || '')}</div>
+      </div>`;
+    paintTimer(); return;
+  }
+
+  if (screen === 'logo') {
+    /* Just the brand, gently floating. No QR here — the corner QR is
+       already up, and two QR codes on one screen only makes people
+       hesitate over which one to point the camera at. */
+    $('stage').innerHTML = `
+      <div class="col center tc" style="height:100%;gap:clamp(12px,2vh,26px);padding:3vh 4vw">
+        <img class="float-slow" src="${SA.brand.logo}" style="width:min(340px,30vw)" alt="">
+        <div style="font:800 clamp(22px,2.8vw,50px)/1.2 var(--fd);color:var(--primary)">
+          ${SA.esc((INFO && INFO.title) || SA.brand.name)}</div>
+        <div class="mut" style="font-size:clamp(11px,1vw,17px);letter-spacing:.16em;text-transform:uppercase">
+          ${SA.esc(SA.t('tagline'))}</div>
+      </div>`;
+    paintTimer(); return;
+  }
+
+  if (screen === 'leaderboard') {
+    const rows = LIVE.board || [];
+    $('stage').innerHTML = `
+      <div class="col" style="height:100%;justify-content:center;gap:2.4vh;padding:3vh 5vw">
+        <div class="tc" style="font:800 clamp(24px,3vw,54px)/1.2 var(--fd);color:var(--primary)">
+          🏆 ${SA.esc(SA.t('sc.leading'))}</div>
+        <div style="font-size:.7em">${SA.render.leaderboard(rows)}</div>
+      </div>`;
+    paintTimer(); return;
+  }
+
+  /* The other top 10: who won THIS question, not who is winning the
+     show. The host publishes it when they give points; here it is just
+     read back out of live state. */
+  if (screen === 'qtop') {
+    $('stage').innerHTML = `
+      <div class="col" style="height:100%;justify-content:center;gap:2.4vh;padding:3vh 5vw">
+        <div class="tc" style="font:800 clamp(24px,3vw,54px)/1.2 var(--fd);color:var(--primary)">
+          ⚡ ${SA.esc(SA.t('play.board_q'))}</div>
+        <div style="font-size:.7em">${SA.render.qtop(LIVE.qtop || [])}</div>
+      </div>`;
+    paintTimer(); return;
+  }
+
+  if (screen === 'teams') {
+    $('stage').innerHTML = `
+      <div class="col" style="height:100%;justify-content:center;gap:3vh;padding:3vh 5vw">
+        <div class="tc" style="font:800 clamp(24px,3vw,54px)/1.2 var(--fd);color:var(--primary)">
+          👥 ${SA.esc(SA.t('sc.team_scores'))}</div>
+        ${SA.render.teamBoard(TEAMS, { bars: true }) || `<div class="mut tc">${SA.t('db.no_teams')}</div>`}
+      </div>`;
+    paintTimer(); return;
+  }
+
+  if (!round) { $('stage').innerHTML = SA.render.logoScreen(INFO && INFO.title); paintTimer(); return; }
+
+  SA.types.call(round.type, 'screenView', $('stage'), {
+    sid: SID, vid: VID, live: LIVE, round,
+    players: PLAYERS, teams: TEAMS,
+    title: (INFO && INFO.title) || SA.brand.name
+  });
+  paintTimer();
+}
+
+/* The timer floats above whatever the type drew. If the type left a
+   #q-timer placeholder, it lands there instead. */
+function startTick() {
+  clearInterval(tick);
+  tick = setInterval(paintTimer, 200);
+}
+function paintTimer() {
+  const slot = $('stage').querySelector('#q-timer');
+  const float = $('tmr');
+  if (!LIVE.endAt || !LIVE.open) {
+    float.style.display = 'none';
+    if (slot) slot.innerHTML = '';
+    return;
+  }
+  const total = LIVE.endAt - (LIVE.startAt || LIVE.endAt);
+  const left = Math.max(0, LIVE.endAt - SA.db.now());
+  const html = SA.render.timerRing(left, total);
+  if (slot) { slot.innerHTML = html; float.style.display = 'none'; }
+  else { float.innerHTML = html; float.style.display = 'block'; }
+}
+</script>
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

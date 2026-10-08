@@ -1,0 +1,41 @@
+{
+  "database": {
+    "rules": "FIREBASE_RULES.json"
+  },
+  "hosting": [
+    {
+      "target": "kbs",
+      "public": "public",
+      "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+      "rewrites": [
+        { "source": "/join", "destination": "/index.html" }
+      ],
+      "headers": [
+        {
+          "source": "**/*.html",
+          "headers": [{ "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" }]
+        }
+      ]
+    },
+    {
+      "target": "sa",
+      "public": "sarvodayahinsa",
+      "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+      "rewrites": [
+        { "source": "/join", "destination": "/index.html" },
+        { "source": "/play", "destination": "/play.html" },
+        { "source": "/host", "destination": "/host.html" },
+        { "source": "/screen", "destination": "/screen.html" },
+        { "source": "/studio", "destination": "/studio.html" },
+        { "source": "/dashboard", "destination": "/dashboard.html" },
+        { "source": "/tickets", "destination": "/tickets.html" }
+      ],
+      "headers": [
+        {
+          "source": "**/*.@(html|js|css)",
+          "headers": [{ "key": "Cache-Control", "value": "no-cache" }]
+        }
+      ]
+    }
+  ]
+}
